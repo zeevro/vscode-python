@@ -114,6 +114,7 @@ export class JupyterServerBase implements INotebookServer {
     private sessionStartTime: number | undefined;
     private pendingCellSubscriptions: CellSubscriber[] = [];
     private ranInitialSetup = false;
+    private id = uuid();
 
     constructor(
         liveShare: ILiveShareApi,
@@ -127,6 +128,8 @@ export class JupyterServerBase implements INotebookServer {
     }
 
     public async connect(launchInfo: INotebookServerLaunchInfo, cancelToken?: CancellationToken) {
+        this.logger.logInformation(`Connecting server ${this.id}`);
+
         // Save our launch info
         this.launchInfo = launchInfo;
 
@@ -146,6 +149,7 @@ export class JupyterServerBase implements INotebookServer {
     }
 
     public shutdown(): Promise<void> {
+        this.logger.logInformation(`Shutting down ${this.id}`);
         const dispose = this.session ? this.session.dispose() : undefined;
         return dispose ? dispose : Promise.resolve();
     }

@@ -42,10 +42,12 @@ export class CodeCssGenerator implements ICodeCssGenerator {
 
             // Then we have to find where the theme resources are loaded from
             if (theme) {
+                this.logger.logInformation('Searching for token colors ...');
                 const tokenColors = await this.findTokenColors(theme);
 
                 // The tokens object then contains the necessary data to generate our css
                 if (tokenColors && font && fontSize) {
+                    this.logger.logInformation('Using colors to generate CSS ...');
                     return this.generateCss(theme, tokenColors, font, fontSize, terminalCursor);
                 }
             }
@@ -196,15 +198,20 @@ export class CodeCssGenerator implements ICodeCssGenerator {
                 content: new RegExp(`[name|id][',"]:\\s*[',"]${escapedThemeName}[',"]`)
             }
         };
+
+        this.logger.logInformation('Loading file color searcher ...');
         // tslint:disable-next-line:no-require-imports
         const fm = require('file-matcher') as typeof import('file-matcher');
         const matcher = new fm.FileMatcher();
 
         try {
+            this.logger.logInformation(`Attempting search for colors in path ${extensionsPath} ...`);
             const results = await matcher.find(searchOptions);
 
             // Use the first result if we have one
             if (results && results.length > 0) {
+                this.logger.logInformation(`Loading colors from ${results[0]} ...`)
+
                 // This should be the path to the file. Load it as a json object
                 const contents = await fs.readFile(results[0], 'utf8');
                 const json = JSON.parse(stripJsonComments(contents)) as JSONObject;
@@ -234,8 +241,11 @@ export class CodeCssGenerator implements ICodeCssGenerator {
                     // Then the path entry should contain a relative path to the json file with
                     // the tokens in it
                     const themeFile = path.join(path.dirname(results[0]), found['path']);
+                    this.logger.logInformation(`Reading colors from ${themeFile}`);
                     return await this.readTokenColors(themeFile);
                 }
+            } else {
+                this.logger.logWarning(`Color theme ${theme} not found. Using default colors.`);
             }
         } catch (err) {
             // Swallow any exceptions with searching or parsing

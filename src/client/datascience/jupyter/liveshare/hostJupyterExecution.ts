@@ -4,6 +4,8 @@
 import '../../../common/extensions';
 
 import * as os from 'os';
+import * as path from 'path';
+import * as uuid from 'uuid/v4';
 import { CancellationToken, Disposable } from 'vscode';
 import * as vsls from 'vsls/vscode';
 
@@ -21,7 +23,8 @@ import {
     IJupyterCommandFactory,
     IJupyterExecution,
     IJupyterSessionManager,
-    INotebookServer
+    INotebookServer,
+    INotebookServerOptions
 } from '../../types';
 import { JupyterExecutionBase } from '../jupyterExecution';
 import { LiveShareParticipantHost } from './liveShareParticipantMixin';
@@ -35,7 +38,8 @@ export class HostJupyterExecution
     implements IRoleBasedObject, IJupyterExecution {
     private sharedServers: Disposable [] = [];
     private fowardedPorts: number [] = [];
-    private runningServer: INotebookServer | undefined;
+    private serverCache : Map<string, INotebookServer> = new Map<string, INotebookServer>();
+    private emptyKey = uuid();
     constructor(
         liveShare: ILiveShareApi,
         executionFactory: IPythonExecutionFactory,
@@ -45,10 +49,10 @@ export class HostJupyterExecution
         logger: ILogger,
         disposableRegistry: IDisposableRegistry,
         asyncRegistry: IAsyncDisposableRegistry,
-        fileSystem: IFileSystem,
+        private fileSys: IFileSystem,
         sessionManager: IJupyterSessionManager,
-        workspace: IWorkspaceService,
-        configuration: IConfigurationService,
+        private workspace: IWorkspaceService,
+        private configService: IConfigurationService,
         commandFactory : IJupyterCommandFactory,
         serviceContainer: IServiceContainer) {
         super(
@@ -60,10 +64,10 @@ export class HostJupyterExecution
             logger,
             disposableRegistry,
             asyncRegistry,
-            fileSystem,
+            fileSys,
             sessionManager,
             workspace,
-            configuration,
+            configService,
             commandFactory,
             serviceContainer);
     }
@@ -73,50 +77,58 @@ export class HostJupyterExecution
         const api = await this.api;
         await this.onDetach(api);
         this.fowardedPorts = [];
+        // Dispose of all of our cached servers
+        for (let [k, s] of this.serverCache) {
+            await s.dispose();
+        }
     }
 
-    public async connectToNotebookServer(uri: string | undefined, usingDarkTheme: boolean, useDefaultConfig: boolean, cancelToken?: CancellationToken, workingDir?: string): Promise<INotebookServer | undefined> {
-        // We only have a single server at a time.
-        if (!this.runningServer) {
-
+    public async connectToNotebookServer(options?: INotebookServerOptions, cancelToken?: CancellationToken): Promise<INotebookServer | undefined> {
+        // See if we have this server in our cache already or not
+        const fixedOptions = await this.generateDefaultOptions(options);
+        const key = this.generateServerKey(fixedOptions);
+        if (this.serverCache.has(key)) {
+            return this.serverCache.get(key);
+        } else {
             // Create the server
-            let sharedServerDisposable : Disposable | undefined;
-            const result = await super.connectToNotebookServer(uri, usingDarkTheme, useDefaultConfig, cancelToken, workingDir);
+            let sharedServerDisposable: Disposable | undefined;
+            let port = -1;
+            const result = await super.connectToNotebookServer(fixedOptions, cancelToken);
 
             // Then using the liveshare api, port forward whatever port is being used by the server
 
             // tslint:disable-next-line:no-suspicious-comment
             // TODO: Liveshare can actually change this value on the guest. So on the guest side we need to listen
             // to an event they are going to add to their api
-            if (!uri && result) {
+            if (result) {
                 const connectionInfo = result.getConnectionInfo();
-                if (connectionInfo) {
+                if (connectionInfo && connectionInfo.localLaunch) {
                     const portMatch = RegExpValues.ExtractPortRegex.exec(connectionInfo.baseUrl);
                     if (portMatch && portMatch.length > 1) {
-                        sharedServerDisposable = await this.portForwardServer(parseInt(portMatch[1], 10));
+                        port = parseInt(portMatch[1], 10);
+                        sharedServerDisposable = await this.portForwardServer(port);
                     }
                 }
             }
 
             if (result) {
+                this.serverCache.set(key, result);
+
                 // Save this result, but modify its dispose such that we
                 // can detach from the server when it goes away.
-                this.runningServer = result;
                 const oldDispose = result.dispose.bind(result);
                 result.dispose = () => {
+                    this.fowardedPorts = this.fowardedPorts.filter(p => p != port);
                     // Dispose of the shared server
                     if (sharedServerDisposable) {
                         sharedServerDisposable.dispose();
                     }
-                    // Mark as not having a running server anymore
-                    this.runningServer = undefined;
-
+                    this.serverCache.delete(key);
                     return oldDispose();
                 };
             }
+            return result;
         }
-
-        return this.runningServer;
     }
 
     public async onAttach(api: vsls.LiveShare | null) : Promise<void> {
@@ -186,7 +198,8 @@ export class HostJupyterExecution
 
     private onRemoteConnectToNotebookServer = async (args: any[], cancellation: CancellationToken): Promise<IConnection | undefined> => {
         // Connect to the local server. THe local server should have started the port forwarding already
-        const localServer = await this.connectToNotebookServer(undefined, args[0], args[1], cancellation, args[2]);
+        const options = await this.generateDefaultOptions(args[0] as INotebookServerOptions | undefined);
+        const localServer = await this.connectToNotebookServer(options, cancellation);
 
         // Extract the URI and token for the other side
         if (localServer) {
@@ -203,4 +216,61 @@ export class HostJupyterExecution
         // Just call local
         return this.getUsableJupyterPython(cancellation);
     }
+
+    private generateServerKey(options?: INotebookServerOptions) : string {
+        if (!options) {
+            return this.emptyKey;
+        } else {
+            // combine all the values together to make a unique key
+            return options.purpose +
+                (options.uri ? options.uri : '') +
+                (options.useDefaultConfig ? 'true' : 'false') +
+                (options.usingDarkTheme ? 'true' : 'false') + // Ideally we'd have different results for different themes. Not sure how to handle this.
+                (options.workingDir);
+        }
+    }
+
+    private async generateDefaultOptions(options? : INotebookServerOptions) : Promise<INotebookServerOptions> {
+        return {
+            uri: options ? options.uri : undefined,
+            useDefaultConfig : options ? options.useDefaultConfig : true, // Default for this is true.
+            usingDarkTheme : options ? options.usingDarkTheme : undefined,
+            purpose : options ? options.purpose : uuid(),
+            workingDir : options && options.workingDir ? options.workingDir : await this.calculateWorkingDirectory()
+        }
+    }
+
+    private async calculateWorkingDirectory(): Promise<string | undefined> {
+        let workingDir: string | undefined;
+        // For a local launch calculate the working directory that we should switch into
+        const settings = this.configService.getSettings();
+        const fileRoot = settings.datascience.notebookFileRoot;
+
+        // If we don't have a workspace open the notebookFileRoot seems to often have a random location in it (we use ${workspaceRoot} as default)
+        // so only do this setting if we actually have a valid workspace open
+        if (fileRoot && this.workspace.hasWorkspaceFolders) {
+            const workspaceFolderPath = this.workspace.workspaceFolders![0].uri.fsPath;
+            if (path.isAbsolute(fileRoot)) {
+                if (await this.fileSys.directoryExists(fileRoot)) {
+                    // User setting is absolute and exists, use it
+                    workingDir = fileRoot;
+                } else {
+                    // User setting is absolute and doesn't exist, use workspace
+                    workingDir = workspaceFolderPath;
+                }
+            } else {
+                // fileRoot is a relative path, combine it with the workspace folder
+                const combinedPath = path.join(workspaceFolderPath, fileRoot);
+                if (await this.fileSys.directoryExists(combinedPath)) {
+                    // combined path exists, use it
+                    workingDir = combinedPath;
+                } else {
+                    // Combined path doesn't exist, use workspace
+                    workingDir = workspaceFolderPath;
+                }
+            }
+        }
+        return workingDir;
+    }
+
 }

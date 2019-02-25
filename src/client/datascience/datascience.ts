@@ -5,9 +5,10 @@ import '../common/extensions';
 
 import { inject, injectable } from 'inversify';
 import { URL } from 'url';
+import * as uuid from 'uuid/v4';
 import * as vscode from 'vscode';
 
-import { IApplicationShell, IDocumentManager } from '../common/application/types';
+import { IApplicationShell, IDocumentManager, ICommandManager } from '../common/application/types';
 import { PYTHON_ALLFILES, PYTHON_LANGUAGE } from '../common/constants';
 import { ContextKey } from '../common/contextKey';
 import {
@@ -25,7 +26,6 @@ import { hasCells } from './cellFactory';
 import { Commands, EditorContexts, Settings, Telemetry } from './constants';
 import {
     ICodeWatcher,
-    ICommandBroker,
     IDataScience,
     IDataScienceCodeLensProvider,
     IDataScienceCommandListener
@@ -39,7 +39,7 @@ export class DataScience implements IDataScience {
     private changeHandler: IDisposable | undefined;
     private startTime: number = Date.now();
     constructor(@inject(IServiceContainer) private serviceContainer: IServiceContainer,
-        @inject(ICommandBroker) private commandBroker: ICommandBroker,
+        @inject(ICommandManager) private commandManager: ICommandManager,
         @inject(IDisposableRegistry) private disposableRegistry: IDisposableRegistry,
         @inject(IExtensionContext) private extensionContext: IExtensionContext,
         @inject(IDataScienceCodeLensProvider) private dataScienceCodeLensProvider: IDataScienceCodeLensProvider,
@@ -80,7 +80,7 @@ export class DataScience implements IDataScience {
         }
     }
 
-    public async runAllCells(file: string, id: string): Promise<void> {
+    public async runAllCells(file: string): Promise<void> {
         this.dataScienceSurveyBanner.showBanner().ignoreErrors();
 
         let codeWatcher = this.getCodeWatcher(file);
@@ -88,7 +88,7 @@ export class DataScience implements IDataScience {
             codeWatcher = this.getCurrentCodeWatcher();
         }
         if (codeWatcher) {
-            return codeWatcher.runAllCells(id);
+            return codeWatcher.runAllCells();
         } else {
             return Promise.resolve();
         }
@@ -96,44 +96,42 @@ export class DataScience implements IDataScience {
 
     // Note: see codewatcher.ts where the runcell command args are attached. The reason we don't have any
     // objects for parameters is because they can't be recreated when passing them through the LiveShare API
-    public async runCell(file: string, startLine: number, startChar: number, endLine: number, endChar: number, id: string): Promise<void> {
+    public async runCell(file: string, startLine: number, startChar: number, endLine: number, endChar: number): Promise<void> {
         this.dataScienceSurveyBanner.showBanner().ignoreErrors();
         const codeWatcher = this.getCodeWatcher(file);
         if (codeWatcher) {
-            return codeWatcher.runCell(new vscode.Range(startLine, startChar, endLine, endChar), id);
-        } else {
-            return this.runCurrentCell(id);
+            return codeWatcher.runCell(new vscode.Range(startLine, startChar, endLine, endChar));
         }
     }
 
-    public async runCurrentCell(id: string): Promise<void> {
+    public async runCurrentCell(): Promise<void> {
         this.dataScienceSurveyBanner.showBanner().ignoreErrors();
 
         const activeCodeWatcher = this.getCurrentCodeWatcher();
         if (activeCodeWatcher) {
-            return activeCodeWatcher.runCurrentCell(id);
+            return activeCodeWatcher.runCurrentCell();
         } else {
             return Promise.resolve();
         }
     }
 
-    public async runCurrentCellAndAdvance(id: string): Promise<void> {
+    public async runCurrentCellAndAdvance(): Promise<void> {
         this.dataScienceSurveyBanner.showBanner().ignoreErrors();
 
         const activeCodeWatcher = this.getCurrentCodeWatcher();
         if (activeCodeWatcher) {
-            return activeCodeWatcher.runCurrentCellAndAdvance(id);
+            return activeCodeWatcher.runCurrentCellAndAdvance();
         } else {
             return Promise.resolve();
         }
     }
 
-    public async runSelectionOrLine(id: string): Promise<void> {
+    public async runSelectionOrLine(... args: any[]): Promise<void> {
         this.dataScienceSurveyBanner.showBanner().ignoreErrors();
 
         const activeCodeWatcher = this.getCurrentCodeWatcher();
         if (activeCodeWatcher) {
-            return activeCodeWatcher.runSelectionOrLine(this.documentManager.activeTextEditor, id);
+            return activeCodeWatcher.runSelectionOrLine(this.documentManager.activeTextEditor);
         } else {
             return Promise.resolve();
         }
@@ -155,6 +153,8 @@ export class DataScience implements IDataScience {
                 break;
         }
     }
+
+    private
 
     @captureTelemetry(Telemetry.SetJupyterURIToLocal)
     private async setJupyterURIToLocal(): Promise<void> {
@@ -186,13 +186,20 @@ export class DataScience implements IDataScience {
         return null;
     }
 
+    private extractId(...args: any[]) : string {
+        if (args && args.length > 0) {
+            return args[args.length-1].toString();
+        }
+        return uuid();
+    }
+
     private onSettingsChanged = () => {
         const settings = this.configuration.getSettings();
         const enabled = settings.datascience.enabled;
-        let editorContext = new ContextKey(EditorContexts.DataScienceEnabled, this.commandBroker);
+        let editorContext = new ContextKey(EditorContexts.DataScienceEnabled, this.commandManager);
         editorContext.set(enabled).catch();
         const ownsSelection = settings.datascience.sendSelectionToInteractiveWindow;
-        editorContext = new ContextKey(EditorContexts.OwnsSelection, this.commandBroker);
+        editorContext = new ContextKey(EditorContexts.OwnsSelection, this.commandManager);
         editorContext.set(ownsSelection && enabled).catch();
     }
 
@@ -219,26 +226,26 @@ export class DataScience implements IDataScience {
     }
 
     private registerCommands(): void {
-        let disposable = this.commandBroker.registerCommand(Commands.RunAllCells, this.runAllCells, this);
+        let disposable = this.commandManager.registerCommand(Commands.RunAllCells, this.runAllCells, this);
         this.disposableRegistry.push(disposable);
-        disposable = this.commandBroker.registerCommand(Commands.RunCell, this.runCell, this);
+        disposable = this.commandManager.registerCommand(Commands.RunCell, this.runCell, this);
         this.disposableRegistry.push(disposable);
-        disposable = this.commandBroker.registerCommand(Commands.RunCurrentCell, this.runCurrentCell, this);
+        disposable = this.commandManager.registerCommand(Commands.RunCurrentCell, this.runCurrentCell, this);
         this.disposableRegistry.push(disposable);
-        disposable = this.commandBroker.registerCommand(Commands.RunCurrentCellAdvance, this.runCurrentCellAndAdvance, this);
+        disposable = this.commandManager.registerCommand(Commands.RunCurrentCellAdvance, this.runCurrentCellAndAdvance, this);
         this.disposableRegistry.push(disposable);
-        disposable = this.commandBroker.registerCommand(Commands.ExecSelectionInInteractiveWindow, this.runSelectionOrLine, this);
+        disposable = this.commandManager.registerCommand(Commands.ExecSelectionInInteractiveWindow, this.runSelectionOrLine, this);
         this.disposableRegistry.push(disposable);
-        disposable = this.commandBroker.registerCommand(Commands.SelectJupyterURI, this.selectJupyterURI, this);
+        disposable = this.commandManager.registerCommand(Commands.SelectJupyterURI, this.selectJupyterURI, this);
         this.disposableRegistry.push(disposable);
         this.commandListeners.forEach((listener: IDataScienceCommandListener) => {
-            listener.register(this.commandBroker);
+            listener.register(this.commandManager);
         });
     }
 
     private onChangedActiveTextEditor() {
         // Setup the editor context for the cells
-        const editorContext = new ContextKey(EditorContexts.HasCodeCells, this.commandBroker);
+        const editorContext = new ContextKey(EditorContexts.HasCodeCells, this.commandManager);
         const activeEditor = this.documentManager.activeTextEditor;
 
         if (activeEditor && activeEditor.document.languageId === PYTHON_LANGUAGE) {

@@ -76,7 +76,6 @@ import { JupyterExecutionFactory } from '../../client/datascience/jupyter/jupyte
 import { JupyterExporter } from '../../client/datascience/jupyter/jupyterExporter';
 import { JupyterImporter } from '../../client/datascience/jupyter/jupyterImporter';
 import { JupyterServerFactory } from '../../client/datascience/jupyter/jupyterServerFactory';
-import { JupyterServerManager } from '../../client/datascience/jupyter/jupyterServerManager';
 import { JupyterSessionManager } from '../../client/datascience/jupyter/jupyterSessionManager';
 import { StatusProvider } from '../../client/datascience/statusProvider';
 import {
@@ -90,7 +89,6 @@ import {
     INotebookExporter,
     INotebookImporter,
     INotebookServer,
-    INotebookServerManager,
     IStatusProvider
 } from '../../client/datascience/types';
 import { EnvironmentActivationService } from '../../client/interpreter/activation/service';
@@ -200,7 +198,6 @@ export class DataScienceIocContainer extends UnitTestIocContainer {
     public registerDataScienceTypes() {
         this.registerFileSystemTypes();
         this.serviceManager.addSingleton<IJupyterExecution>(IJupyterExecution, JupyterExecutionFactory);
-        this.serviceManager.addSingleton<INotebookServerManager>(INotebookServerManager, JupyterServerManager);
         this.serviceManager.addSingleton<IHistoryProvider>(IHistoryProvider, HistoryProvider);
         this.serviceManager.add<IHistory>(IHistory, History);
         this.serviceManager.add<INotebookImporter>(INotebookImporter, JupyterImporter);

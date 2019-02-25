@@ -6,8 +6,8 @@ import { Disposable, ProgressLocation, ProgressOptions } from 'vscode';
 
 import { IApplicationShell } from '../common/application/types';
 import { createDeferred, Deferred } from '../common/utils/async';
-import { HistoryMessages } from './constants';
 import { IHistoryProvider, IStatusProvider } from './types';
+import { HistoryMessages } from './historyTypes';
 
 class StatusItem implements Disposable {
 

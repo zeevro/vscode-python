@@ -15,15 +15,19 @@ import { ICell, IDataScience, IJupyterSessionManager, INotebookServer, Interrupt
 import { JupyterServerBase } from '../jupyterServer';
 import { LiveShareParticipantHost } from './liveShareParticipantMixin';
 import { IRoleBasedObject } from './roleBasedFactory';
-import { IResponseMapping, IServerResponse, ServerResponseType } from './types';
+import { IResponseMapping, IServerResponse, ServerResponseType, IExecuteObservableResponse } from './types';
+import { ResponseQueue } from './responseQueue';
+import { IExecuteInfo } from '../../historyTypes';
 
 // tslint:disable:no-any
 
 export class HostJupyterServer
     extends LiveShareParticipantHost(JupyterServerBase, LiveShare.JupyterServerSharedService)
     implements IRoleBasedObject, INotebookServer {
-    private responseBacklog : IServerResponse[] = [];
+    private responseQueue : ResponseQueue = new ResponseQueue();
+    private requestLog : Map<string, number> = new Map<string, number>();
     private catchupPendingCount : number = 0;
+    private disposed = false;
     constructor(
         liveShare: ILiveShareApi,
         dataScience: IDataScience,
@@ -36,9 +40,12 @@ export class HostJupyterServer
     }
 
     public async dispose(): Promise<void> {
-        await super.dispose();
-        const api = await this.api;
-        return this.onDetach(api) ;
+        if (!this.disposed) {
+            this.disposed = true;
+            await super.dispose();
+            const api = await this.api;
+            return this.onDetach(api) ;
+        }
     }
 
     public async onDetach(api: vsls.LiveShare | null) : Promise<void> {
@@ -48,14 +55,20 @@ export class HostJupyterServer
     }
 
     public async onAttach(api: vsls.LiveShare | null) : Promise<void> {
-        if (api) {
+        if (api && !this.disposed) {
             const service = await this.waitForService();
 
             // Attach event handlers to different requests
             if (service) {
-                service.onRequest(LiveShareCommands.syncRequest, (args: object, cancellation: CancellationToken) => this.onSync());
-                service.onRequest(LiveShareCommands.getSysInfo, (args: any[], cancellation: CancellationToken) => this.onGetSysInfoRequest(cancellation));
+                // Requests return arrays
+                service.onRequest(LiveShareCommands.syncRequest, (args: any[], cancellation: CancellationToken) => this.onSync());
+                service.onRequest(LiveShareCommands.getSysInfo, (args:  any[], cancellation: CancellationToken) => this.onGetSysInfoRequest(cancellation));
+                service.onRequest(LiveShareCommands.restart, (args:  any[], cancellation: CancellationToken) => this.onRestartRequest(cancellation))
+                service.onRequest(LiveShareCommands.interrupt, (args:  any[], cancellation: CancellationToken) => this.onInterruptRequest(args.length > 0 ? args[0] as number : LiveShare.InterruptDefaultTimeout, cancellation))
+
+                // Notifications are always objects.
                 service.onNotify(LiveShareCommands.catchupRequest, (args: object) => this.onCatchupRequest(args));
+                service.onNotify(LiveShareCommands.executeObservable, (args: object) => this.onExecuteObservableRequest(args));
             }
         }
     }
@@ -69,11 +82,26 @@ export class HostJupyterServer
 
     public executeObservable(code: string, file: string, line: number, id: string): Observable<ICell[]> {
         try {
-            const inner = super.executeObservable(code, file, line, id);
+            // See if this has already been asked for not
+            if (this.requestLog.has(id)) {
+                // Create a dummy observable out of the responses as they come in.
+                return this.responseQueue.waitForObservable(code, file, line, id);
+            } else {
+                // Otherwise save this request
+                this.requestLog.set(id, Date.now());
+                const inner = super.executeObservable(code, file, line, id);
 
-            // Wrap the observable returned so we can listen to it too
-            return this.wrapObservableResult(code, inner, id);
+                // Cleanup old requests
+                const now = Date.now();
+                for (let [k, val] of this.requestLog) {
+                    if (now - val > LiveShare.ResponseLifetime) {
+                        this.requestLog.delete(k);
+                    }
+                }
 
+                // Wrap the observable returned so we can listen to it too
+                return this.wrapObservableResult(code, inner, id);
+            }
         } catch (exc) {
             this.postException(exc);
             throw exc;
@@ -83,9 +111,7 @@ export class HostJupyterServer
 
     public async restartKernel(): Promise<void> {
         try {
-            const time = Date.now();
             await super.restartKernel();
-            return this.postResult(ServerResponseType.Restart, {type: ServerResponseType.Restart, time});
         } catch (exc) {
             this.postException(exc);
             throw exc;
@@ -96,7 +122,6 @@ export class HostJupyterServer
         try {
             const time = Date.now();
             const result = await super.interruptKernel(timeoutMs);
-            this.postResult(ServerResponseType.Interrupt, {type: ServerResponseType.Interrupt, time, result});
             return result;
         } catch (exc) {
             this.postException(exc);
@@ -121,20 +146,43 @@ export class HostJupyterServer
         return super.getSysInfo();
     }
 
+    private onRestartRequest(cancellation: CancellationToken) : Promise<any> {
+        // Just call the base
+        return super.restartKernel();
+    }
+    private onInterruptRequest(timeout: number, cancellation: CancellationToken) : Promise<any> {
+        // Just call the base
+        return super.interruptKernel(timeout);
+    }
+
     private async onCatchupRequest(args: object) : Promise<void> {
         if (args.hasOwnProperty('since')) {
             const service = await this.waitForService();
             if (service) {
                 // Send results for all responses that are left.
-                this.responseBacklog.forEach(r => {
-                    service.notify(LiveShareCommands.serverResponse, r);
-                });
+                this.responseQueue.send(service);
 
                 // Eliminate old responses if possible.
                 this.catchupPendingCount -= 1;
                 if (this.catchupPendingCount <= 0) {
-                    this.responseBacklog = [];
+                    this.responseQueue.clear();
                 }
+            }
+        }
+    }
+
+    private onExecuteObservableRequest(args: object) {
+        // See if we started this execute or not already.
+        if (args.hasOwnProperty('code')) {
+            const obj = args as IExecuteInfo;
+            if (!this.requestLog.has(obj.id)) {
+                // Convert the file name
+                const uri = vscode.Uri.parse(`vsls:${obj.file}`);
+                const file = this.finishedApi ? this.finishedApi.convertLocalUriToShared(uri).fsPath : obj.file;
+
+                // Just call the execute. Locally we won't listen, but if an actual call comes in for the same
+                // request, it will use the saved responses.
+                this.execute(obj.code, file, obj.line, obj.id).ignoreErrors();
             }
         }
     }
@@ -191,7 +239,7 @@ export class HostJupyterServer
                 }).ignoreErrors();
 
                 // Need to also save in memory for those guests that are in the middle of starting up
-                this.responseBacklog.push(typedResult);
+                this.responseQueue.push(typedResult);
             }
     }
 }
