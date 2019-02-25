@@ -83,6 +83,7 @@ export interface IJupyterExecution extends IAsyncDisposable {
     spawnNotebook(file: string) : Promise<void>;
     importNotebook(file: string, template: string) : Promise<string>;
     getUsableJupyterPython(cancelToken?: CancellationToken) : Promise<PythonInterpreter | undefined>;
+    getServer(options?: INotebookServerOptions) : Promise<INotebookServer | undefined>;
 }
 
 export const IJupyterSession = Symbol('IJupyterSession');
@@ -120,6 +121,7 @@ export interface IHistoryProvider {
     getActive() : IHistory | undefined;
 
     getOrCreateActive(): Promise<IHistory>;
+    getNotebookOptions() : INotebookServerOptions;
 }
 
 export const IHistory = Symbol('IHistory');

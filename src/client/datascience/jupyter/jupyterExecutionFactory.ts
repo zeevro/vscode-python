@@ -131,4 +131,8 @@ export class JupyterExecutionFactory implements IJupyterExecution, IAsyncDisposa
         const execution = await this.executionFactory.get();
         return execution.getUsableJupyterPython(cancelToken);
     }
+    public async getServer(options?: INotebookServerOptions) : Promise<INotebookServer | undefined> {
+        const execution = await this.executionFactory.get();
+        return execution.getServer(options);
+    }
 }

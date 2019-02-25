@@ -45,7 +45,9 @@ import {
     INotebookServer,
     InterruptResult,
     IStatusProvider,
-    ISysInfo
+    ISysInfo,
+    INotebookServerOptions,
+    IHistoryProvider
 } from './types';
 import { vscMockSelection } from '../../test/mocks/vsc/selection';
 import { IHistoryMapping, HistoryMessages, IAddedSysInfo, IGotoCode, ISubmitNewCell, IRemoteAddCode } from './historyTypes';
@@ -89,7 +91,9 @@ export class History implements IHistory {
         @inject(IConfigurationService) private configuration: IConfigurationService,
         @inject(ICommandManager) private commandManager: ICommandManager,
         @inject(INotebookExporter) private jupyterExporter: INotebookExporter,
-        @inject(IWorkspaceService) private workspaceService: IWorkspaceService) {
+        @inject(IWorkspaceService) private workspaceService: IWorkspaceService,
+        @inject(IHistoryProvider) private historyProvider: IHistoryProvider,
+        ) {
 
         // Create our unique id. We use this to skip messages we send to other history windows
         this.id = uuid();
@@ -648,33 +652,11 @@ export class History implements IHistory {
     }
 
     private async loadJupyterServer(restart?: boolean): Promise<void> {
-        // Find the settings that we are going to launch our server with
-        const settings = this.configuration.getSettings();
-        let serverURI: string | undefined = settings.datascience.jupyterServerURI;
-        const useDefaultConfig: boolean | undefined = settings.datascience.useDefaultConfigForJupyter;
-        // Check for dark theme, if so set matplot lib to use dark_background settings
-        let darkTheme: boolean = false;
-        const workbench = this.workspaceService.getConfiguration('workbench');
-        if (workbench) {
-            const theme = workbench.get<string>('colorTheme');
-            if (theme) {
-                darkTheme = /dark/i.test(theme);
-            }
-        }
-
-        // For the local case pass in our URI as undefined, that way connect doesn't have to check the setting
-        if (serverURI === Settings.JupyterServerLocalLaunch) {
-            serverURI = undefined;
-        }
+        // Extract our options
+        const options = this.historyProvider.getNotebookOptions();
 
         // Now try to create a notebook server
-        this.jupyterServer = await this.jupyterExecution.connectToNotebookServer(
-            {
-                uri: serverURI,
-                usingDarkTheme: darkTheme,
-                useDefaultConfig,
-                purpose: Identifiers.HistoryPurpose
-            });
+        this.jupyterServer = await this.jupyterExecution.connectToNotebookServer(options);
     }
 
     private generateSysInfoCell = async (reason: SysInfoReason): Promise<ICell | undefined> => {
@@ -801,7 +783,7 @@ export class History implements IHistory {
 
     private load = async (): Promise<void> => {
         // Status depends upon if we're about to connect to existing server or not.
-        const status = (await this.jupyterServerManager.getServer()) ?
+        const status = (await this.jupyterExecution.getServer(this.historyProvider.getNotebookOptions())) ?
             this.setStatus(localize.DataScience.connectingToJupyter()) : this.setStatus(localize.DataScience.startingJupyter());
 
         // Check to see if we support ipykernel or not

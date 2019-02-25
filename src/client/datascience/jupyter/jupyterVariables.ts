@@ -11,7 +11,8 @@ import { IFileSystem } from '../../common/platform/types';
 import * as localize from '../../common/utils/localize';
 import { EXTENSION_ROOT_DIR } from '../../constants';
 import { Identifiers } from '../constants';
-import { ICell, IJupyterVariable, IJupyterVariables, INotebookServerManager } from '../types';
+import { ICell, IJupyterVariable, IJupyterVariables, IJupyterExecution, INotebookServerOptions, IHistoryProvider } from '../types';
+import { IConfigurationService } from '../../common/types';
 
 @injectable()
 export class JupyterVariables implements IJupyterVariables {
@@ -19,7 +20,8 @@ export class JupyterVariables implements IJupyterVariables {
 
     constructor(
         @inject(IFileSystem) private fileSystem: IFileSystem,
-        @inject(INotebookServerManager) private jupyterServerManager: INotebookServerManager
+        @inject(IJupyterExecution) private jupyterExecution: IJupyterExecution,
+        @inject(IHistoryProvider) private historyProvider: IHistoryProvider
         ) {
     }
 
@@ -30,7 +32,7 @@ export class JupyterVariables implements IJupyterVariables {
             await this.loadVariablesFile();
         }
 
-        const activeServer = this.jupyterServerManager.getActiveServer();
+        const activeServer = await this.jupyterExecution.getServer(this.historyProvider.getNotebookOptions());
         if (!activeServer) {
             // No active server will just return an empty list
             return [];

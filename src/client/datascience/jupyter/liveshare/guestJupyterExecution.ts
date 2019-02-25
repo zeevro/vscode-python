@@ -23,10 +23,12 @@ import {
 import { JupyterConnectError } from '../jupyterConnectError';
 import { JupyterExecutionBase } from '../jupyterExecution';
 import { LiveShareParticipantGuest } from './liveShareParticipantMixin';
+import { ServerCache } from './serverCache';
 
 // This class is really just a wrapper around a jupyter execution that also provides a shared live share service
 @injectable()
 export class GuestJupyterExecution extends LiveShareParticipantGuest(JupyterExecutionBase, LiveShare.JupyterExecutionService) {
+    private serverCache : ServerCache;
 
     constructor(
         liveShare: ILiveShareApi,
@@ -59,10 +61,14 @@ export class GuestJupyterExecution extends LiveShareParticipantGuest(JupyterExec
             commandFactory,
             serviceContainer);
         asyncRegistry.push(this);
+        this.serverCache = new ServerCache(configuration, workspace, fileSystem);
     }
 
     public async dispose() : Promise<void> {
         await super.dispose();
+
+        // Dispose of all of our cached servers
+        await this.serverCache.dispose();
     }
 
     public async isNotebookSupported(cancelToken?: CancellationToken): Promise<boolean> {
@@ -81,7 +87,12 @@ export class GuestJupyterExecution extends LiveShareParticipantGuest(JupyterExec
         return Promise.resolve(false);
     }
     public async connectToNotebookServer(options?: INotebookServerOptions, cancelToken?: CancellationToken): Promise<INotebookServer> {
-        let result: INotebookServer | undefined ;
+        let result: INotebookServer | undefined = await this.serverCache.get(options);
+
+        // See if we already have this server or not.
+        if (result) {
+            return result;
+        }
 
         // Create the server on the remote machine. It should return an IConnection we can use to build a remote uri
         const service = await this.waitForService();
@@ -123,6 +134,10 @@ export class GuestJupyterExecution extends LiveShareParticipantGuest(JupyterExec
         if (service) {
             return service.request(LiveShareCommands.getUsableJupyterPython, [], cancelToken);
         }
+    }
+
+    public async getServer(options?: INotebookServerOptions) : Promise<INotebookServer | undefined> {
+        return this.serverCache.get(options);
     }
 
     private async checkSupported(command: string, cancelToken?: CancellationToken) : Promise<boolean> {

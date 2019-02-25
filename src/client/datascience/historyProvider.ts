@@ -4,12 +4,12 @@
 import * as uuid from 'uuid/v4';
 import { inject, injectable } from 'inversify';
 
-import { IDisposableRegistry, IAsyncDisposable, IAsyncDisposableRegistry } from '../common/types';
+import { IDisposableRegistry, IAsyncDisposable, IAsyncDisposableRegistry, IConfigurationService } from '../common/types';
 import { IServiceContainer } from '../ioc/types';
-import { IHistory, IHistoryProvider } from './types';
+import { IHistory, IHistoryProvider, INotebookServerOptions } from './types';
 import { PostOffice } from './liveshare/postOffice';
-import { ILiveShareApi } from '../common/application/types';
-import { LiveShare, LiveShareCommands } from './constants';
+import { ILiveShareApi, IWorkspaceService } from '../common/application/types';
+import { LiveShare, LiveShareCommands, Settings, Identifiers } from './constants';
 import { Deferred, createDeferred } from '../common/utils/async';
 
 @injectable()
@@ -23,7 +23,10 @@ export class HistoryProvider implements IHistoryProvider, IAsyncDisposable {
         @inject(ILiveShareApi) private liveShare: ILiveShareApi,
         @inject(IServiceContainer) private serviceContainer: IServiceContainer,
         @inject(IAsyncDisposableRegistry) asyncRegistry : IAsyncDisposableRegistry,
-        @inject(IDisposableRegistry) private disposables: IDisposableRegistry) {
+        @inject(IDisposableRegistry) private disposables: IDisposableRegistry,
+        @inject(IConfigurationService) private configService: IConfigurationService,
+        @inject(IWorkspaceService) private workspaceService: IWorkspaceService,
+        ) {
         asyncRegistry.push(this);
 
         // Create a post office so we can make sure history windows are created at the same time
@@ -56,6 +59,35 @@ export class HistoryProvider implements IHistoryProvider, IAsyncDisposable {
         // Now that all of our peers have sync'd, return the history to use.
         return this.activeHistory;
     }
+
+    public getNotebookOptions() : INotebookServerOptions {
+        // Find the settings that we are going to launch our server with
+        const settings = this.configService.getSettings();
+        let serverURI: string | undefined = settings.datascience.jupyterServerURI;
+        const useDefaultConfig: boolean | undefined = settings.datascience.useDefaultConfigForJupyter;
+        // Check for dark theme, if so set matplot lib to use dark_background settings
+        let darkTheme: boolean = false;
+        const workbench = this.workspaceService.getConfiguration('workbench');
+        if (workbench) {
+            const theme = workbench.get<string>('colorTheme');
+            if (theme) {
+                darkTheme = /dark/i.test(theme);
+            }
+        }
+
+        // For the local case pass in our URI as undefined, that way connect doesn't have to check the setting
+        if (serverURI === Settings.JupyterServerLocalLaunch) {
+            serverURI = undefined;
+        }
+
+        return {
+            uri: serverURI,
+            usingDarkTheme: darkTheme,
+            useDefaultConfig,
+            purpose: Identifiers.HistoryPurpose
+        };
+    }
+
 
     public dispose() : Promise<void> {
         return this.postOffice.dispose();

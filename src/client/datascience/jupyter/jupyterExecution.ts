@@ -198,6 +198,11 @@ export class JupyterExecutionBase implements IJupyterExecution {
         return result.stdout;
     }
 
+    public getServer(options?: INotebookServerOptions) : Promise<INotebookServer | undefined> {
+        // This is cached at the host or guest level
+        return Promise.resolve(undefined);
+    }
+
     protected async getMatchingKernelSpec(connection?: IConnection, cancelToken?: CancellationToken): Promise<IJupyterKernelSpec | undefined> {
         // If not using an active connection, check on disk
         if (!connection) {

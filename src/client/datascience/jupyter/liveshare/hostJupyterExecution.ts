@@ -4,7 +4,6 @@
 import '../../../common/extensions';
 
 import * as os from 'os';
-import * as path from 'path';
 import * as uuid from 'uuid/v4';
 import { CancellationToken, Disposable } from 'vscode';
 import * as vsls from 'vsls/vscode';
@@ -29,6 +28,7 @@ import {
 import { JupyterExecutionBase } from '../jupyterExecution';
 import { LiveShareParticipantHost } from './liveShareParticipantMixin';
 import { IRoleBasedObject } from './roleBasedFactory';
+import { ServerCache } from './serverCache';
 
 // tslint:disable:no-any
 
@@ -38,7 +38,7 @@ export class HostJupyterExecution
     implements IRoleBasedObject, IJupyterExecution {
     private sharedServers: Disposable [] = [];
     private fowardedPorts: number [] = [];
-    private serverCache : Map<string, INotebookServer> = new Map<string, INotebookServer>();
+    private serverCache : ServerCache;
     private emptyKey = uuid();
     constructor(
         liveShare: ILiveShareApi,
@@ -70,30 +70,25 @@ export class HostJupyterExecution
             configService,
             commandFactory,
             serviceContainer);
+        this.serverCache = new ServerCache(configService, workspace, fileSys);
     }
 
     public async dispose() : Promise<void> {
         await super.dispose();
         const api = await this.api;
         await this.onDetach(api);
-        this.fowardedPorts = [];
-        // Dispose of all of our cached servers
-        for (let [k, s] of this.serverCache) {
-            await s.dispose();
-        }
     }
 
     public async connectToNotebookServer(options?: INotebookServerOptions, cancelToken?: CancellationToken): Promise<INotebookServer | undefined> {
         // See if we have this server in our cache already or not
-        const fixedOptions = await this.generateDefaultOptions(options);
-        const key = this.generateServerKey(fixedOptions);
-        if (this.serverCache.has(key)) {
-            return this.serverCache.get(key);
+        let result = await this.serverCache.get(options);
+        if (result) {
+            return result;
         } else {
             // Create the server
             let sharedServerDisposable: Disposable | undefined;
             let port = -1;
-            const result = await super.connectToNotebookServer(fixedOptions, cancelToken);
+            result = await super.connectToNotebookServer(await this.serverCache.generateDefaultOptions(options), cancelToken);
 
             // Then using the liveshare api, port forward whatever port is being used by the server
 
@@ -112,20 +107,15 @@ export class HostJupyterExecution
             }
 
             if (result) {
-                this.serverCache.set(key, result);
-
                 // Save this result, but modify its dispose such that we
                 // can detach from the server when it goes away.
-                const oldDispose = result.dispose.bind(result);
-                result.dispose = () => {
+                this.serverCache.set(result, () => {
                     this.fowardedPorts = this.fowardedPorts.filter(p => p != port);
                     // Dispose of the shared server
                     if (sharedServerDisposable) {
                         sharedServerDisposable.dispose();
                     }
-                    this.serverCache.delete(key);
-                    return oldDispose();
-                };
+                }, options);
             }
             return result;
         }
@@ -158,6 +148,15 @@ export class HostJupyterExecution
         // Unshare all of our port forwarded servers
         this.sharedServers.forEach(s => s.dispose());
         this.sharedServers = [];
+        this.fowardedPorts = [];
+
+        // clear our cached servers. We need to reconnect
+        await this.serverCache.dispose();
+    }
+
+    public getServer(options?: INotebookServerOptions) : Promise<INotebookServer | undefined> {
+        // See if we have this server or not.
+        return this.serverCache.get(options);
     }
 
     private async portForwardServer(port: number) : Promise<Disposable | undefined> {
@@ -198,8 +197,7 @@ export class HostJupyterExecution
 
     private onRemoteConnectToNotebookServer = async (args: any[], cancellation: CancellationToken): Promise<IConnection | undefined> => {
         // Connect to the local server. THe local server should have started the port forwarding already
-        const options = await this.generateDefaultOptions(args[0] as INotebookServerOptions | undefined);
-        const localServer = await this.connectToNotebookServer(options, cancellation);
+        const localServer = await this.connectToNotebookServer(args[0] as INotebookServerOptions | undefined, cancellation);
 
         // Extract the URI and token for the other side
         if (localServer) {
@@ -216,61 +214,4 @@ export class HostJupyterExecution
         // Just call local
         return this.getUsableJupyterPython(cancellation);
     }
-
-    private generateServerKey(options?: INotebookServerOptions) : string {
-        if (!options) {
-            return this.emptyKey;
-        } else {
-            // combine all the values together to make a unique key
-            return options.purpose +
-                (options.uri ? options.uri : '') +
-                (options.useDefaultConfig ? 'true' : 'false') +
-                (options.usingDarkTheme ? 'true' : 'false') + // Ideally we'd have different results for different themes. Not sure how to handle this.
-                (options.workingDir);
-        }
-    }
-
-    private async generateDefaultOptions(options? : INotebookServerOptions) : Promise<INotebookServerOptions> {
-        return {
-            uri: options ? options.uri : undefined,
-            useDefaultConfig : options ? options.useDefaultConfig : true, // Default for this is true.
-            usingDarkTheme : options ? options.usingDarkTheme : undefined,
-            purpose : options ? options.purpose : uuid(),
-            workingDir : options && options.workingDir ? options.workingDir : await this.calculateWorkingDirectory()
-        }
-    }
-
-    private async calculateWorkingDirectory(): Promise<string | undefined> {
-        let workingDir: string | undefined;
-        // For a local launch calculate the working directory that we should switch into
-        const settings = this.configService.getSettings();
-        const fileRoot = settings.datascience.notebookFileRoot;
-
-        // If we don't have a workspace open the notebookFileRoot seems to often have a random location in it (we use ${workspaceRoot} as default)
-        // so only do this setting if we actually have a valid workspace open
-        if (fileRoot && this.workspace.hasWorkspaceFolders) {
-            const workspaceFolderPath = this.workspace.workspaceFolders![0].uri.fsPath;
-            if (path.isAbsolute(fileRoot)) {
-                if (await this.fileSys.directoryExists(fileRoot)) {
-                    // User setting is absolute and exists, use it
-                    workingDir = fileRoot;
-                } else {
-                    // User setting is absolute and doesn't exist, use workspace
-                    workingDir = workspaceFolderPath;
-                }
-            } else {
-                // fileRoot is a relative path, combine it with the workspace folder
-                const combinedPath = path.join(workspaceFolderPath, fileRoot);
-                if (await this.fileSys.directoryExists(combinedPath)) {
-                    // combined path exists, use it
-                    workingDir = combinedPath;
-                } else {
-                    // Combined path doesn't exist, use workspace
-                    workingDir = workspaceFolderPath;
-                }
-            }
-        }
-        return workingDir;
-    }
-
 }
