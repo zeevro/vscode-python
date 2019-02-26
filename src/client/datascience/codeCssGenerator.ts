@@ -76,7 +76,7 @@ export class CodeCssGenerator implements ICodeCssGenerator {
         });
     }
 
-    private getScopeColor = (tokenColors: JSONArray, scope: string, secondary?: string): string => {
+    private getScopeStyle = (tokenColors: JSONArray, scope: string, secondary?: string): { color: string, fontStyle: string } => {
         // Search through the scopes on the json object
         let match = this.matchTokenColor(tokenColors, scope);
         if (match < 0 && secondary) {
@@ -86,12 +86,15 @@ export class CodeCssGenerator implements ICodeCssGenerator {
         if (found !== null) {
             const settings = found['settings'];
             if (settings && settings !== null) {
-                return settings['foreground'];
+                const fontStyle = settings['fontStyle'] ? settings['fontStyle'] : 'normal';
+                const foreground = settings['foreground'] ? settings['foreground'] : 'var(--vscode-editor-foreground)';
+
+                return { fontStyle, color: foreground };
             }
         }
 
         // Default to editor foreground
-        return 'var(--vscode-editor-foreground)';
+        return { color: 'var(--vscode-editor-foreground)', fontStyle: 'normal' };
     }
 
     // tslint:disable-next-line:max-func-body-length
@@ -99,15 +102,15 @@ export class CodeCssGenerator implements ICodeCssGenerator {
         const escapedThemeName = Identifiers.GeneratedThemeName;
 
         // There's a set of values that need to be found
-        const comment = this.getScopeColor(tokenColors, 'comment');
-        const numeric = this.getScopeColor(tokenColors, 'constant.numeric');
-        const stringColor = this.getScopeColor(tokenColors, 'string');
-        const keyword = this.getScopeColor(tokenColors, 'keyword.control', 'keyword');
-        const operator = this.getScopeColor(tokenColors, 'keyword.operator');
-        const variable = this.getScopeColor(tokenColors, 'variable');
+        const commentStyle = this.getScopeStyle(tokenColors, 'comment');
+        const numericStyle = this.getScopeStyle(tokenColors, 'constant.numeric');
+        const stringStyle = this.getScopeStyle(tokenColors, 'string');
+        const keywordStyle = this.getScopeStyle(tokenColors, 'keyword.control', 'keyword');
+        const operatorStyle = this.getScopeStyle(tokenColors, 'keyword.operator');
+        const variableStyle = this.getScopeStyle(tokenColors, 'variable');
         // const atomic = this.getScopeColor(tokenColors, 'atomic');
-        const builtin = this.getScopeColor(tokenColors, 'support.function');
-        const punctuation = this.getScopeColor(tokenColors, 'punctuation');
+        const builtinStyle = this.getScopeStyle(tokenColors, 'support.function');
+        const punctuationStyle = this.getScopeStyle(tokenColors, 'punctuation');
 
         const def = 'var(--vscode-editor-foreground)';
 
@@ -120,7 +123,7 @@ export class CodeCssGenerator implements ICodeCssGenerator {
         // Use these values to fill in our format string
         return `
         :root {
-            --code-comment-color: ${comment};
+            --code-comment-color: ${commentStyle.color};
             --code-font-family: ${fontFamily};
             --code-font-size:${fontSize}px;
         }
@@ -129,19 +132,19 @@ export class CodeCssGenerator implements ICodeCssGenerator {
         .cm-link {text-decoration: underline;}
         .cm-strikethrough {text-decoration: line-through;}
 
-        .cm-s-${escapedThemeName} span.cm-keyword {color: ${keyword};}
-        .cm-s-${escapedThemeName} span.cm-number {color: ${numeric};}
-        .cm-s-${escapedThemeName} span.cm-def {color: ${def};}
-        .cm-s-${escapedThemeName} span.cm-variable {color: ${variable};}
-        .cm-s-${escapedThemeName} span.cm-punctuation {color: ${punctuation};}
+        .cm-s-${escapedThemeName} span.cm-keyword {color: ${keywordStyle.color}; font-style: ${keywordStyle.fontStyle}; }
+        .cm-s-${escapedThemeName} span.cm-number {color: ${numericStyle.color}; font-style: ${numericStyle.fontStyle}; }
+        .cm-s-${escapedThemeName} span.cm-def {color: ${def}; }
+        .cm-s-${escapedThemeName} span.cm-variable {color: ${variableStyle.color}; font-style: ${variableStyle.fontStyle}; }
+        .cm-s-${escapedThemeName} span.cm-punctuation {color: ${punctuationStyle.color}; font-style: ${punctuationStyle.fontStyle}; }
         .cm-s-${escapedThemeName} span.cm-property,
-        .cm-s-${escapedThemeName} span.cm-operator {color: ${operator};}
-        .cm-s-${escapedThemeName} span.cm-variable-2 {color: ${variable};}
-        .cm-s-${escapedThemeName} span.cm-variable-3, .cm-s-${theme} .cm-type {color: ${variable};}
-        .cm-s-${escapedThemeName} span.cm-comment {color: ${comment};}
-        .cm-s-${escapedThemeName} span.cm-string {color: ${stringColor};}
-        .cm-s-${escapedThemeName} span.cm-string-2 {color: ${stringColor};}
-        .cm-s-${escapedThemeName} span.cm-builtin {color: ${builtin};}
+        .cm-s-${escapedThemeName} span.cm-operator {color: ${operatorStyle.color}; font-style: ${operatorStyle.fontStyle}; }
+        .cm-s-${escapedThemeName} span.cm-variable-2 {color: ${variableStyle.color}; font-style: ${variableStyle.fontStyle}; }
+        .cm-s-${escapedThemeName} span.cm-variable-3, .cm-s-${theme} .cm-type {color: ${variableStyle.color}; font-style: ${variableStyle.fontStyle}; }
+        .cm-s-${escapedThemeName} span.cm-comment {color: ${commentStyle.color}; font-style: ${commentStyle.fontStyle}; } 
+        .cm-s-${escapedThemeName} span.cm-string {color: ${stringStyle.color}; font-style: ${stringStyle.fontStyle}; }
+        .cm-s-${escapedThemeName} span.cm-string-2 {color: ${stringStyle.color}; font-style: ${stringStyle.fontStyle}; }
+        .cm-s-${escapedThemeName} span.cm-builtin {color: ${builtinStyle.color}; font-style: ${builtinStyle.fontStyle}; }
         .cm-s-${escapedThemeName} div.CodeMirror-cursor ${cursorStyle}
         .cm-s-${escapedThemeName} div.CodeMirror-selected {background: var(--vscode-editor-selectionBackground) !important;}
 `;
@@ -167,6 +170,12 @@ export class CodeCssGenerator implements ICodeCssGenerator {
 
             // Theme is a root, don't need to include others
             return tokenColors;
+        }
+
+        // Might also have a 'settings' object that equates to token colors
+        const settings = theme['settings'] as JSONArray;
+        if (settings && settings.length > 0) {
+            return settings;        
         }
 
         return [];
