@@ -32,7 +32,7 @@ export class JupyterVariables implements IJupyterVariables {
             await this.loadVariablesFile();
         }
 
-        const activeServer = await this.jupyterExecution.getServer(this.historyProvider.getNotebookOptions());
+        const activeServer = await this.jupyterExecution.getServer(await this.historyProvider.getNotebookOptions());
         if (!activeServer) {
             // No active server will just return an empty list
             return [];

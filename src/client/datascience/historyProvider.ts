@@ -6,7 +6,7 @@ import { inject, injectable } from 'inversify';
 
 import { IDisposableRegistry, IAsyncDisposable, IAsyncDisposableRegistry, IConfigurationService } from '../common/types';
 import { IServiceContainer } from '../ioc/types';
-import { IHistory, IHistoryProvider, INotebookServerOptions } from './types';
+import { IHistory, IHistoryProvider, INotebookServerOptions, IThemeFinder } from './types';
 import { PostOffice } from './liveshare/postOffice';
 import { ILiveShareApi, IWorkspaceService } from '../common/application/types';
 import { LiveShare, LiveShareCommands, Settings, Identifiers } from './constants';
@@ -26,6 +26,7 @@ export class HistoryProvider implements IHistoryProvider, IAsyncDisposable {
         @inject(IDisposableRegistry) private disposables: IDisposableRegistry,
         @inject(IConfigurationService) private configService: IConfigurationService,
         @inject(IWorkspaceService) private workspaceService: IWorkspaceService,
+        @inject(IThemeFinder) private themeFinder: IThemeFinder
         ) {
         asyncRegistry.push(this);
 
@@ -60,7 +61,7 @@ export class HistoryProvider implements IHistoryProvider, IAsyncDisposable {
         return this.activeHistory;
     }
 
-    public getNotebookOptions() : INotebookServerOptions {
+    public async getNotebookOptions() : Promise<INotebookServerOptions> {
         // Find the settings that we are going to launch our server with
         const settings = this.configService.getSettings();
         let serverURI: string | undefined = settings.datascience.jupyterServerURI;
@@ -71,7 +72,7 @@ export class HistoryProvider implements IHistoryProvider, IAsyncDisposable {
         if (workbench) {
             const theme = workbench.get<string>('colorTheme');
             if (theme) {
-                darkTheme = /dark/i.test(theme);
+                darkTheme = await this.themeFinder.isThemeDark(theme);
             }
         }
 

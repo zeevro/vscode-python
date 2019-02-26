@@ -121,7 +121,7 @@ export interface IHistoryProvider {
     getActive() : IHistory | undefined;
 
     getOrCreateActive(): Promise<IHistory>;
-    getNotebookOptions() : INotebookServerOptions;
+    getNotebookOptions() : Promise<INotebookServerOptions>;
 }
 
 export const IHistory = Symbol('IHistory');
@@ -206,6 +206,12 @@ export interface ISysInfo extends nbformat.IBaseCell {
 export const ICodeCssGenerator = Symbol('ICodeCssGenerator');
 export interface ICodeCssGenerator {
     generateThemeCss() : Promise<string>;
+}
+
+export const IThemeFinder = Symbol('IThemeFinder');
+export interface IThemeFinder {
+    findThemeRootJson(themeName: string) : Promise<string | undefined>;
+    isThemeDark(themeName: string) : Promise<boolean | undefined>;
 }
 
 export const IStatusProvider = Symbol('IStatusProvider');

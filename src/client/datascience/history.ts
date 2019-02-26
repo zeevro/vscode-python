@@ -653,7 +653,7 @@ export class History implements IHistory {
 
     private async loadJupyterServer(restart?: boolean): Promise<void> {
         // Extract our options
-        const options = this.historyProvider.getNotebookOptions();
+        const options = await this.historyProvider.getNotebookOptions();
 
         // Now try to create a notebook server
         this.jupyterServer = await this.jupyterExecution.connectToNotebookServer(options);
@@ -783,7 +783,7 @@ export class History implements IHistory {
 
     private load = async (): Promise<void> => {
         // Status depends upon if we're about to connect to existing server or not.
-        const status = (await this.jupyterExecution.getServer(this.historyProvider.getNotebookOptions())) ?
+        const status = (await this.jupyterExecution.getServer(await this.historyProvider.getNotebookOptions())) ?
             this.setStatus(localize.DataScience.connectingToJupyter()) : this.setStatus(localize.DataScience.startingJupyter());
 
         // Check to see if we support ipykernel or not
