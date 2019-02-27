@@ -115,6 +115,7 @@ export class JupyterServerBase implements INotebookServer {
     private pendingCellSubscriptions: CellSubscriber[] = [];
     private ranInitialSetup = false;
     private id = uuid();
+    private connectPromise: Deferred<INotebookServerLaunchInfo> = createDeferred<INotebookServerLaunchInfo>();
 
     constructor(
         liveShare: ILiveShareApi,
@@ -127,11 +128,14 @@ export class JupyterServerBase implements INotebookServer {
         this.asyncRegistry.push(this);
     }
 
-    public async connect(launchInfo: INotebookServerLaunchInfo, cancelToken?: CancellationToken) {
+    public async connect(launchInfo: INotebookServerLaunchInfo, cancelToken?: CancellationToken) : Promise<void> {
         this.logger.logInformation(`Connecting server ${this.id}`);
 
         // Save our launch info
         this.launchInfo = launchInfo;
+
+        // Indicate connect started
+        this.connectPromise.resolve(launchInfo);
 
         // Start our session
         this.session = await this.sessionManager.startNew(launchInfo.connectionInfo, launchInfo.kernelSpec, cancelToken);
@@ -337,12 +341,8 @@ export class JupyterServerBase implements INotebookServer {
         throw new Error(localize.DataScience.sessionDisposed());
     }
 
-    public getLaunchInfo(): INotebookServerLaunchInfo | undefined {
-        if (!this.launchInfo) {
-            return undefined;
-        }
-
-        return this.launchInfo;
+    public waitForConnect(): Promise<INotebookServerLaunchInfo | undefined> {
+        return this.connectPromise.promise;
     }
 
     // Return a copy of the connection information that this server used to connect with

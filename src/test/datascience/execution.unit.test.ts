@@ -90,7 +90,7 @@ class MockJupyterServer implements INotebookServer {
     public getConnectionInfo(): IConnection | undefined {
         return this.launchInfo ? this.launchInfo.connectionInfo : undefined;
     }
-    public getLaunchInfo(): INotebookServerLaunchInfo | undefined {
+    public waitForConnect(): Promise<INotebookServerLaunchInfo | undefined> {
         throw new Error('Method not implemented');
     }
     public async shutdown() {

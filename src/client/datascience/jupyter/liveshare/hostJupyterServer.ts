@@ -11,7 +11,7 @@ import * as vsls from 'vsls/vscode';
 import { ILiveShareApi } from '../../../common/application/types';
 import { IAsyncDisposableRegistry, IConfigurationService, IDisposableRegistry, ILogger } from '../../../common/types';
 import { Identifiers, LiveShare, LiveShareCommands } from '../../constants';
-import { ICell, IDataScience, IJupyterSessionManager, INotebookServer, InterruptResult } from '../../types';
+import { ICell, IDataScience, IJupyterSessionManager, INotebookServer, InterruptResult, INotebookServerLaunchInfo } from '../../types';
 import { JupyterServerBase } from '../jupyterServer';
 import { LiveShareParticipantHost } from './liveShareParticipantMixin';
 import { IRoleBasedObject } from './roleBasedFactory';
@@ -48,12 +48,6 @@ export class HostJupyterServer
         }
     }
 
-    public async onDetach(api: vsls.LiveShare | null) : Promise<void> {
-        if (api) {
-            return api.unshareService(LiveShare.JupyterServerSharedService);
-        }
-    }
-
     public async onAttach(api: vsls.LiveShare | null) : Promise<void> {
         if (api && !this.disposed) {
             const service = await this.waitForService();
@@ -71,6 +65,11 @@ export class HostJupyterServer
                 service.onNotify(LiveShareCommands.executeObservable, (args: object) => this.onExecuteObservableRequest(args));
             }
         }
+    }
+
+    public waitForServerName() : Promise<string> {
+        // Use our base name plus our purpose. This means one unique server per purpose
+        return LiveShare.JupyterServerSharedService + this.getLaunchInfo().purpose;
     }
 
     public async onPeerChange(ev: vsls.PeersChangeEvent) : Promise<void> {
@@ -178,7 +177,7 @@ export class HostJupyterServer
             if (!this.requestLog.has(obj.id)) {
                 // Convert the file name
                 const uri = vscode.Uri.parse(`vsls:${obj.file}`);
-                const file = this.finishedApi ? this.finishedApi.convertLocalUriToShared(uri).fsPath : obj.file;
+                const file = this.finishedApi ? this.finishedApi.convertSharedUriToLocal(uri).fsPath : obj.file;
 
                 // Just call the execute. Locally we won't listen, but if an actual call comes in for the same
                 // request, it will use the saved responses.

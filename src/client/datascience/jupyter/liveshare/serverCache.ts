@@ -45,6 +45,7 @@ export class ServerCache implements IAsyncDisposable {
         const oldDispose = result.dispose.bind(result);
         result.dispose = () => {
             this.cache.delete(key);
+            disposeCallback();
             return oldDispose();
         };
     }

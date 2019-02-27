@@ -35,6 +35,7 @@ export class GuestJupyterServer
     implements INotebookServer, ILiveShareParticipant {
     private launchInfo : INotebookServerLaunchInfo | undefined;
     private responseQueue : ResponseQueue = new ResponseQueue();
+    private connectPromise: Deferred<INotebookServerLaunchInfo> = createDeferred<INotebookServerLaunchInfo>();
 
     constructor(
         liveShare: ILiveShareApi,
@@ -49,15 +50,21 @@ export class GuestJupyterServer
 
     public async connect(launchInfo: INotebookServerLaunchInfo, cancelToken?: CancellationToken): Promise<void> {
         this.launchInfo = launchInfo;
+        this.connectPromise.resolve(launchInfo);
         return Promise.resolve();
     }
 
-    public shutdown(): Promise<void> {
-        return Promise.resolve();
+    public async shutdown(): Promise<void> {
+        // Send this across to the other side
+        const service = await this.waitForService();
+        if (service) {
+            service.notify(LiveShareCommands.disposeServer)
+        }
+
     }
 
     public dispose(): Promise<void> {
-        return Promise.resolve();
+        return this.shutdown();
     }
 
     public waitForIdle(): Promise<void> {
@@ -124,8 +131,8 @@ export class GuestJupyterServer
         return undefined;
     }
 
-    public getLaunchInfo(): INotebookServerLaunchInfo | undefined {
-        return this.launchInfo;
+    public waitForConnect(): Promise<INotebookServerLaunchInfo | undefined> {
+        return this.connectPromise.promise;
     }
 
     public async getSysInfo() : Promise<ICell | undefined> {

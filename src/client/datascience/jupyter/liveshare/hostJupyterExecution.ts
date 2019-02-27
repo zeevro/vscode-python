@@ -39,7 +39,6 @@ export class HostJupyterExecution
     private sharedServers: Disposable [] = [];
     private fowardedPorts: number [] = [];
     private serverCache : ServerCache;
-    private emptyKey = uuid();
     constructor(
         liveShare: ILiveShareApi,
         executionFactory: IPythonExecutionFactory,
@@ -49,10 +48,10 @@ export class HostJupyterExecution
         logger: ILogger,
         disposableRegistry: IDisposableRegistry,
         asyncRegistry: IAsyncDisposableRegistry,
-        private fileSys: IFileSystem,
+        fileSys: IFileSystem,
         sessionManager: IJupyterSessionManager,
-        private workspace: IWorkspaceService,
-        private configService: IConfigurationService,
+        workspace: IWorkspaceService,
+        configService: IConfigurationService,
         commandFactory : IJupyterCommandFactory,
         serviceContainer: IServiceContainer) {
         super(
@@ -141,9 +140,7 @@ export class HostJupyterExecution
     }
 
     public async onDetach(api: vsls.LiveShare | null) : Promise<void> {
-        if (api) {
-            await api.unshareService(LiveShare.JupyterExecutionService);
-        }
+        await super.onDetach(api);
 
         // Unshare all of our port forwarded servers
         this.sharedServers.forEach(s => s.dispose());

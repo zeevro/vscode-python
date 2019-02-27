@@ -69,6 +69,7 @@ function LiveShareParticipantMixin<T extends ClassType<IAsyncDisposable>, S>(
         private actualRole = vsls.Role.None;
         private wantedRole = expectedRole;
         private servicePromise: Promise<S | undefined> | undefined;
+        private serviceFullName: string | undefined;
 
         constructor(...rest: any[]) {
             super(...rest);
@@ -97,8 +98,15 @@ function LiveShareParticipantMixin<T extends ClassType<IAsyncDisposable>, S>(
             noop();
         }
 
-        public async onDetach(api: vsls.LiveShare | null) : Promise<void> {
-            noop();
+        public getServerName() : string {
+            // Default is the service name
+            return serviceName;
+        }
+
+        public onDetach(api: vsls.LiveShare | null) : Promise<void> {
+            if (api && this.serviceFullName && api.session && api.session.role === vsls.Role.Host) {
+                return api.unshareService(this.serviceFullName);
+            }
         }
 
         public async onSessionChange(api: vsls.LiveShare | null) : Promise<void> {
@@ -123,7 +131,8 @@ function LiveShareParticipantMixin<T extends ClassType<IAsyncDisposable>, S>(
             if (!api || (api.session.role !== this.wantedRole)) {
                 this.servicePromise = Promise.resolve(undefined);
             } else {
-                this.servicePromise = serviceWaiter(api, serviceName);
+                this.serviceFullName = this.getServerName();
+                this.servicePromise = serviceWaiter(api, this.serviceFullName);
             }
 
             return this.servicePromise;

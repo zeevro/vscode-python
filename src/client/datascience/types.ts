@@ -46,6 +46,7 @@ export interface INotebookServerLaunchInfo
     kernelSpec: IJupyterKernelSpec | undefined;
     usingDarkTheme: boolean;
     workingDir: string | undefined;
+    purpose: string | undefined; // Purpose this server is for
 }
 
 // Talks to a jupyter ipython kernel to retrieve data for cells
@@ -59,7 +60,7 @@ export interface INotebookServer extends IAsyncDisposable {
     shutdown() : Promise<void>;
     interruptKernel(timeoutInMs: number) : Promise<InterruptResult>;
     setInitialDirectory(directory: string): Promise<void>;
-    getLaunchInfo(): INotebookServerLaunchInfo | undefined;
+    waitForConnect(): Promise<INotebookServerLaunchInfo | undefined>;
     getConnectionInfo(): IConnection | undefined;
     getSysInfo() : Promise<ICell | undefined>;
 }

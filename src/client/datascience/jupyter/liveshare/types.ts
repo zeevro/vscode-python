@@ -4,7 +4,7 @@
 import * as vsls from 'vsls/vscode';
 
 import { IAsyncDisposable } from '../../../common/types';
-import { ICell, InterruptResult } from '../../types';
+import { ICell } from '../../types';
 
 // tslint:disable:max-classes-per-file
 
@@ -45,4 +45,5 @@ export interface ILiveShareParticipant extends IAsyncDisposable {
     onAttach(api: vsls.LiveShare | null) : Promise<void>;
     onDetach(api: vsls.LiveShare | null) : Promise<void>;
     onPeerChange(ev: vsls.PeersChangeEvent) : Promise<void>;
+    getServerName() : string;
 }

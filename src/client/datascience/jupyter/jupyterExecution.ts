@@ -156,7 +156,8 @@ export class JupyterExecutionBase implements IJupyterExecution {
                     kernelSpec: kernelSpec,
                     usingDarkTheme: options && options.usingDarkTheme,
                     workingDir: options ? options.workingDir : undefined,
-                    uri: options ? options.uri : undefined
+                    uri: options ? options.uri : undefined,
+                    purpose: options? options.purpose : uuid()
                 };
                 await result.connect(launchInfo, cancelToken);
                 sendTelemetryEvent(launchInfo.uri ? Telemetry.ConnectRemoteJupyter : Telemetry.ConnectLocalJupyter);
