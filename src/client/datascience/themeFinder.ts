@@ -68,7 +68,8 @@ export class ThemeFinder {
             }
         }
 
-        // If didn't find in the extensions folder, then try searching through the default themes (they don't get listed as extensions)
+        // If didn't find in the extensions folder, then try searching manually. This shouldn't happen, but
+        // this is our backup plan in case vscode changes stuff.
         const currentExe = this.currentProcess.execPath;
         let currentPath = path.dirname(currentExe);
 
@@ -79,15 +80,13 @@ export class ThemeFinder {
             currentPath = path.resolve(currentPath, '../../../..');
             extensionsPath = path.join(currentPath, 'resources', 'app', 'extensions');
         }
-        const others = await this.findMatchingThemes(extensionsPath, themeName);
-        if (others && others.length > 0) {
-            return others[0];
+        const other = await this.findMatchingThemes(extensionsPath, themeName);
+        if (other) {
+            return other;
         }
     }
 
-    private async findMatchingThemes(rootPath: string, themeName: string) : Promise<IThemeData[]> {
-        const foundData : IThemeData[] = [];
-
+    private async findMatchingThemes(rootPath: string, themeName: string) : Promise<IThemeData | undefined> {
         // Search through all package.json files in the directory and below, looking
         // for the themeName in them.
         const foundPackages = await new Promise<string []>((resolve, reject) => {
@@ -104,12 +103,10 @@ export class ThemeFinder {
                 const fpath = path.join(rootPath, f);
                 const data = await this.findMatchingThemeFromJson(fpath, themeName);
                 if (data) {
-                    foundData.push(data);
+                    return data;
                 }
             }
         }
-
-        return foundData;
     }
 
     private async findMatchingThemeFromJson(packageJson: string, themeName: string) : Promise<IThemeData | undefined> {
