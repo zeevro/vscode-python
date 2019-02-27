@@ -69,7 +69,7 @@ suite('JupyterVariables', () => {
     });
 
     test('getVariables no server', async() => {
-        execution.setup(sm => sm.getServer()).returns(() => {
+        execution.setup(sm => sm.getServer(typemoq.It.isAny())).returns(() => {
             return Promise.resolve(undefined);
         });
 
@@ -88,7 +88,7 @@ suite('JupyterVariables', () => {
     // No cells, no output, no text/plain
 
     test('getVariables no cells', async() => {
-        execution.setup(sm => sm.getServer()).returns(() => {
+        execution.setup(sm => sm.getServer(typemoq.It.isAny())).returns(() => {
             return Promise.resolve(fakeServer.object);
         });
 
@@ -108,7 +108,7 @@ suite('JupyterVariables', () => {
     });
 
     test('getVariables no output', async() => {
-        execution.setup(sm => sm.getServer()).returns(() => {
+        execution.setup(sm => sm.getServer(typemoq.It.isAny())).returns(() => {
             return Promise.resolve(fakeServer.object);
         });
 
@@ -128,7 +128,7 @@ suite('JupyterVariables', () => {
     });
 
     test('getVariables bad mime', async() => {
-        execution.setup(sm => sm.getServer()).returns(() => {
+        execution.setup(sm => sm.getServer(typemoq.It.isAny())).returns(() => {
             return Promise.resolve(fakeServer.object);
         });
 
@@ -150,7 +150,7 @@ suite('JupyterVariables', () => {
     });
 
     test('getVariables fake data', async() => {
-        execution.setup(sm => sm.getServer()).returns(() => {
+        execution.setup(sm => sm.getServer(typemoq.It.isAny())).returns(() => {
             return Promise.resolve(fakeServer.object);
         });
 
