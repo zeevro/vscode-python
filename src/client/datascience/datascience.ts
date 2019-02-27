@@ -121,7 +121,7 @@ export class DataScience implements IDataScience {
     }
 
     // tslint:disable-next-line:no-any
-    public async runSelectionOrLine(... args: any[]): Promise<void> {
+    public async runSelectionOrLine(): Promise<void> {
         this.dataScienceSurveyBanner.showBanner().ignoreErrors();
 
         const activeCodeWatcher = this.getCurrentCodeWatcher();
