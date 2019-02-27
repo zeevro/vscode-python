@@ -2,13 +2,14 @@
 // Licensed under the MIT License.
 'use strict';
 import '../../../common/extensions';
-import * as os from 'os';
+
 import * as path from 'path';
 import * as uuid from 'uuid/v4';
-import { INotebookServerOptions, INotebookServer } from '../../types';
-import { IAsyncDisposable, IConfigurationService } from '../../../common/types';
+
 import { IWorkspaceService } from '../../../common/application/types';
 import { IFileSystem } from '../../../common/platform/types';
+import { IAsyncDisposable, IConfigurationService } from '../../../common/types';
+import { INotebookServer, INotebookServerOptions } from '../../types';
 
 export class ServerCache implements IAsyncDisposable {
     private cache : Map<string, INotebookServer> = new Map<string, INotebookServer>();
@@ -33,8 +34,9 @@ export class ServerCache implements IAsyncDisposable {
         const key = this.generateKey(fixedOptions);
 
         // Eliminate any already with this key
-        if (this.cache.has(key)) {
-            await this.cache.get(key).dispose();
+        const item = this.cache.get(key);
+        if (item) {
+            await item.dispose();
         }
 
         // Save in our cache.
@@ -51,7 +53,8 @@ export class ServerCache implements IAsyncDisposable {
     }
 
     public async dispose() : Promise<void> {
-        for (let [k, s] of this.cache) {
+        // tslint:disable-next-line:no-unused-variable
+        for (const [k, s] of this.cache) {
             await s.dispose();
         }
         this.cache.clear();
@@ -64,7 +67,7 @@ export class ServerCache implements IAsyncDisposable {
             usingDarkTheme : options ? options.usingDarkTheme : undefined,
             purpose : options ? options.purpose : uuid(),
             workingDir : options && options.workingDir ? options.workingDir : await this.calculateWorkingDirectory()
-        }
+        };
     }
 
     private generateKey(options?: INotebookServerOptions) : string {

@@ -8,6 +8,7 @@ import * as React from 'react';
 
 import { CellMatcher } from '../../client/datascience/cellMatcher';
 import { generateMarkdownFromCodeLines } from '../../client/datascience/common';
+import { HistoryMessages } from '../../client/datascience/historyTypes';
 import { CellState, ICell, IHistoryInfo } from '../../client/datascience/types';
 import { ErrorBoundary } from '../react-common/errorBoundary';
 import { getLocString } from '../react-common/locReactSide';
@@ -20,7 +21,6 @@ import { Image, ImageName } from './image';
 import { InputHistory } from './inputHistory';
 import { createCellVM, createEditableCellVM, extractInputText, generateTestState, IMainPanelState } from './mainPanelState';
 import { MenuBar } from './menuBar';
-import { HistoryMessages } from '../../client/datascience/historyTypes';
 
 export interface IMainPanelProps {
     skipDefault?: boolean;

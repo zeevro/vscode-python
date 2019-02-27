@@ -3,13 +3,13 @@
 'use strict';
 import '../common/extensions';
 
-import * as uuid from 'uuid/v4';
-import * as vsls from 'vsls/vscode';
 import * as fs from 'fs-extra';
 import { inject, injectable } from 'inversify';
 import * as path from 'path';
+import * as uuid from 'uuid/v4';
 import { Event, EventEmitter, Position, Range, Selection, TextEditor, Uri, ViewColumn } from 'vscode';
 import { Disposable } from 'vscode-jsonrpc';
+import * as vsls from 'vsls/vscode';
 
 import {
     IApplicationShell,
@@ -29,8 +29,9 @@ import { createDeferred, Deferred } from '../common/utils/async';
 import * as localize from '../common/utils/localize';
 import { IInterpreterService } from '../interpreter/contracts';
 import { captureTelemetry, sendTelemetryEvent } from '../telemetry';
-import { EditorContexts, Identifiers, Telemetry, Settings } from './constants';
+import { EditorContexts, Identifiers, Telemetry } from './constants';
 import { HistoryMessageListener } from './historyMessageListener';
+import { HistoryMessages, IAddedSysInfo, IGotoCode, IHistoryMapping, IRemoteAddCode, ISubmitNewCell } from './historyTypes';
 import { JupyterInstallError } from './jupyter/jupyterInstallError';
 import {
     CellState,
@@ -40,17 +41,13 @@ import {
     IDataScienceExtraSettings,
     IHistory,
     IHistoryInfo,
+    IHistoryProvider,
     IJupyterExecution,
     INotebookExporter,
     INotebookServer,
     InterruptResult,
-    IStatusProvider,
-    ISysInfo,
-    INotebookServerOptions,
-    IHistoryProvider
+    IStatusProvider
 } from './types';
-import { vscMockSelection } from '../../test/mocks/vsc/selection';
-import { IHistoryMapping, HistoryMessages, IAddedSysInfo, IGotoCode, ISubmitNewCell, IRemoteAddCode } from './historyTypes';
 
 export enum SysInfoReason {
     Start,
@@ -92,7 +89,7 @@ export class History implements IHistory {
         @inject(ICommandManager) private commandManager: ICommandManager,
         @inject(INotebookExporter) private jupyterExporter: INotebookExporter,
         @inject(IWorkspaceService) private workspaceService: IWorkspaceService,
-        @inject(IHistoryProvider) private historyProvider: IHistoryProvider,
+        @inject(IHistoryProvider) private historyProvider: IHistoryProvider
         ) {
 
         // Create our unique id. We use this to skip messages we send to other history windows
@@ -243,27 +240,27 @@ export class History implements IHistory {
 
     @captureTelemetry(Telemetry.Undo)
     public undoCells() {
-        this.postMessage(HistoryMessages.Undo);
+        this.postMessage(HistoryMessages.Undo).ignoreErrors();
     }
 
     @captureTelemetry(Telemetry.Redo)
     public redoCells() {
-        this.postMessage(HistoryMessages.Redo);
+        this.postMessage(HistoryMessages.Redo).ignoreErrors();
     }
 
     @captureTelemetry(Telemetry.DeleteAllCells)
     public removeAllCells() {
-        this.postMessage(HistoryMessages.DeleteAllCells);
+        this.postMessage(HistoryMessages.DeleteAllCells).ignoreErrors();
     }
 
     @captureTelemetry(Telemetry.ExpandAll)
     public expandAllCells() {
-        this.postMessage(HistoryMessages.ExpandAll);
+        this.postMessage(HistoryMessages.ExpandAll).ignoreErrors();
     }
 
     @captureTelemetry(Telemetry.CollapseAll)
     public collapseAllCells() {
-        this.postMessage(HistoryMessages.CollapseAll);
+        this.postMessage(HistoryMessages.CollapseAll).ignoreErrors();
     }
 
     public exportCells() {
@@ -271,7 +268,7 @@ export class History implements IHistory {
         this.waitingForExportCells = true;
 
         // Telemetry will fire when the export function is called.
-        this.postMessage(HistoryMessages.GetAllCells);
+        this.postMessage(HistoryMessages.GetAllCells).ignoreErrors();
     }
 
     @captureTelemetry(Telemetry.RestartKernel)
@@ -330,6 +327,7 @@ export class History implements IHistory {
         }
     }
 
+    // tslint:disable-next-line:no-any
     private dispatchMessage<M extends IHistoryMapping, T extends keyof M>(message: T, payload: any, handler: (args : M[T]) => void) {
         const args = payload as M[T];
         handler.bind(this)(args);
@@ -351,7 +349,7 @@ export class History implements IHistory {
     // tslint:disable-next-line:no-any
     private onRemoteAddedCode(args: IRemoteAddCode) {
         // Make sure this is valid
-        if (args && args.id && args.file && args.originator != this.id) {
+        if (args && args.id && args.file && args.originator !== this.id) {
             // Submit this item as new code.
             this.submitCode(args.code, args.file, args.line, args.id).ignoreErrors();
         }
@@ -363,7 +361,7 @@ export class History implements IHistory {
         // First we need to finish all outstanding cells.
         this.unfinishedCells.forEach(c => {
             c.state = CellState.error;
-            this.postMessage(HistoryMessages.FinishCell, c);
+            this.postMessage(HistoryMessages.FinishCell, c).ignoreErrors();
         });
         this.unfinishedCells = [];
         this.potentiallyUnfinishedStatus.forEach(s => s.dispose());
@@ -518,7 +516,7 @@ export class History implements IHistory {
                 switch (cell.state) {
                     case CellState.init:
                         // Tell the react controls we have a new cell
-                        this.postMessage(HistoryMessages.StartCell, cell);
+                        this.postMessage(HistoryMessages.StartCell, cell).ignoreErrors();
 
                         // Keep track of this unfinished cell so if we restart we can finish right away.
                         this.unfinishedCells.push(cell);
@@ -526,13 +524,13 @@ export class History implements IHistory {
 
                     case CellState.executing:
                         // Tell the react controls we have an update
-                        this.postMessage(HistoryMessages.UpdateCell, cell);
+                        this.postMessage(HistoryMessages.UpdateCell, cell).ignoreErrors();
                         break;
 
                     case CellState.error:
                     case CellState.finished:
                         // Tell the react controls we're done
-                        this.postMessage(HistoryMessages.FinishCell, cell);
+                        this.postMessage(HistoryMessages.FinishCell, cell).ignoreErrors();
 
                         // Remove from the list of unfinished cells
                         this.unfinishedCells = this.unfinishedCells.filter(c => c.id !== cell.id);
@@ -559,7 +557,7 @@ export class History implements IHistory {
     private onSettingsChanged = () => {
         // Stringify our settings to send over to the panel
         const dsSettings = JSON.stringify(this.generateDataScienceExtraSettings());
-        this.postMessage(HistoryMessages.UpdateSettings, dsSettings);
+        this.postMessage(HistoryMessages.UpdateSettings, dsSettings).ignoreErrors();
     }
 
     private onInterpreterChanged = async () => {
@@ -623,6 +621,14 @@ export class History implements IHistory {
         }
     }
 
+    private showInformationMessage(message: string, question?: string) : Thenable<string | undefined> {
+        if (question) {
+            return this.applicationShell.showInformationMessage(message, question);
+        } else {
+            return this.applicationShell.showInformationMessage(message);
+        }
+    }
+
     private exportToFile = async (cells: ICell[], file: string) => {
         // Take the list of cells, convert them to a notebook json format and write to disk
         if (this.jupyterServer) {
@@ -638,7 +644,7 @@ export class History implements IHistory {
                 // tslint:disable-next-line: no-any
                 await this.fileSystem.writeFile(file, JSON.stringify(notebook), { encoding: 'utf8', flag: 'w' });
                 const openQuestion = (await this.jupyterExecution.isSpawnSupported()) ? localize.DataScience.exportOpenQuestion() : undefined;
-                this.applicationShell.showInformationMessage(localize.DataScience.exportDialogComplete().format(file), openQuestion).then((str: string | undefined) => {
+                this.showInformationMessage(localize.DataScience.exportDialogComplete().format(file), openQuestion).then((str: string | undefined) => {
                     if (str && this.jupyterServer) {
                         // If the user wants to, open the notebook they just generated.
                         this.jupyterExecution.spawnNotebook(file).ignoreErrors();
@@ -722,7 +728,7 @@ export class History implements IHistory {
 
     private addSysInfo = async (reason: SysInfoReason): Promise<void> => {
         if (!this.addSysInfoPromise || reason === SysInfoReason.Interrupt || reason === SysInfoReason.Restart) {
-            this.logger.logInformation(`Adding sys info for ${reason}`)
+            this.logger.logInformation(`Adding sys info for ${reason}`);
             const deferred = createDeferred<boolean>();
             this.addSysInfoPromise = deferred;
 
@@ -733,15 +739,14 @@ export class History implements IHistory {
             }
 
             // For interrupt or restart, tell the other sides of a live share session
-            if (reason === SysInfoReason.Interrupt || reason === SysInfoReason.Restart) {
+            if ((reason === SysInfoReason.Interrupt || reason === SysInfoReason.Restart) && sysInfo) {
                 this.shareMessage(HistoryMessages.AddedSysInfo, { sysInfoCell: sysInfo, id: this.id });
             }
 
-
-            this.logger.logInformation(`Sys info for ${reason} complete`)
+            this.logger.logInformation(`Sys info for ${reason} complete`);
             deferred.resolve(true);
         } else if (this.addSysInfoPromise) {
-            this.logger.logInformation(`Wait for sys info for ${reason}`)
+            this.logger.logInformation(`Wait for sys info for ${reason}`);
             await this.addSysInfoPromise.promise;
         }
     }
@@ -758,26 +763,26 @@ export class History implements IHistory {
     }
 
     private loadWebPanel = async (): Promise<void> => {
-        this.logger.logInformation(`Loading web panel. Panel is ${this.webPanel ? 'set' : 'notset'}`)
+        this.logger.logInformation(`Loading web panel. Panel is ${this.webPanel ? 'set' : 'notset'}`);
 
         // Create our web panel (it's the UI that shows up for the history)
         if (this.webPanel === undefined) {
             // Figure out the name of our main bundle. Should be in our output directory
             const mainScriptPath = path.join(EXTENSION_ROOT_DIR, 'out', 'datascience-ui', 'history-react', 'index_bundle.js');
 
-            this.logger.logInformation(`Generating CSS...`)
+            this.logger.logInformation('Generating CSS...');
             // Generate a css to put into the webpanel for viewing code
             const css = await this.cssGenerator.generateThemeCss();
 
             // Get our settings to pass along to the react control
             const settings = this.generateDataScienceExtraSettings();
 
-            this.logger.logInformation(`Loading web view...`)
+            this.logger.logInformation('Loading web view...');
             // Use this script to create our web view panel. It should contain all of the necessary
             // script to communicate with this class.
             this.webPanel = this.provider.create(this.messageListener, localize.DataScience.historyTitle(), mainScriptPath, css, settings);
 
-            this.logger.logInformation(`Web view created.`)
+            this.logger.logInformation('Web view created.');
         }
     }
 

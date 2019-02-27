@@ -1,14 +1,14 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 'use strict';
-
-import * as vsls from 'vsls/vscode';
-import { IServerResponse, IExecuteObservableResponse } from './types';
-import { createDeferred, Deferred } from '../../../common/utils/async';
 import { Observable } from 'rxjs/Observable';
-import { ICell } from '../../types';
 import { Subscriber } from 'rxjs/Subscriber';
+import * as vsls from 'vsls/vscode';
+
+import { createDeferred, Deferred } from '../../../common/utils/async';
 import { LiveShareCommands } from '../../constants';
+import { ICell } from '../../types';
+import { IExecuteObservableResponse, IServerResponse } from './types';
 
 export class ResponseQueue {
     private responseQueue : IServerResponse [] = [];

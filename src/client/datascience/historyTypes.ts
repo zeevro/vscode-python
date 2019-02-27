@@ -3,7 +3,6 @@
 'use strict';
 
 import { ICell, IHistoryInfo } from './types';
-import { file } from 'tmp';
 
 export namespace HistoryMessages {
     export const StartCell = 'start_cell';
@@ -27,7 +26,7 @@ export namespace HistoryMessages {
     export const UpdateSettings = 'update_settings';
     export const SendInfo = 'send_info';
     export const Started = 'started';
-    export const AddedSysInfo = 'added_sys_info'
+    export const AddedSysInfo = 'added_sys_info';
     export const RemoteAddCode = 'remote_add_code';
 }
 
@@ -37,57 +36,57 @@ export const HistoryRemoteMessages : string[] = [
     HistoryMessages.SubmitNewCell,
     HistoryMessages.AddedSysInfo,
     HistoryMessages.RemoteAddCode
-]
+];
 
 export interface IGotoCode {
-    file: string,
-    line: number
+    file: string;
+    line: number;
 }
 
 export interface IAddedSysInfo {
-    id: string,
-    sysInfoCell: ICell
-}
-
-export interface IRemoteAddCode extends IExecuteInfo {
-    originator: string
-}
-
-export interface ISubmitNewCell {
-    code: string,
-    id: string
+    id: string;
+    sysInfoCell: ICell;
 }
 
 export interface IExecuteInfo {
-    code: string,
-    id: string,
-    file: string,
-    line: number
+    code: string;
+    id: string;
+    file: string;
+    line: number;
+}
+
+export interface IRemoteAddCode extends IExecuteInfo {
+    originator: string;
+}
+
+export interface ISubmitNewCell {
+    code: string;
+    id: string;
 }
 
 // Map all messages to specific payloads
 export class IHistoryMapping {
-    [HistoryMessages.StartCell]: ICell;
-    [HistoryMessages.FinishCell]: ICell;
-    [HistoryMessages.UpdateCell]: ICell;
-    [HistoryMessages.GotoCodeCell]: IGotoCode;
-    [HistoryMessages.RestartKernel]: never | undefined;
-    [HistoryMessages.Export]: ICell[];
-    [HistoryMessages.GetAllCells]: ICell;
-    [HistoryMessages.ReturnAllCells]: ICell[];
-    [HistoryMessages.DeleteCell]: never | undefined;
-    [HistoryMessages.DeleteAllCells]: never | undefined;
-    [HistoryMessages.Undo]: never | undefined;
-    [HistoryMessages.Redo]: never | undefined;
-    [HistoryMessages.ExpandAll]: never | undefined;
-    [HistoryMessages.CollapseAll]: never | undefined;
-    [HistoryMessages.StartProgress]: never | undefined;
-    [HistoryMessages.StopProgress]: never | undefined;
-    [HistoryMessages.Interrupt]: never | undefined;
-    [HistoryMessages.UpdateSettings]: string;
-    [HistoryMessages.SubmitNewCell]: ISubmitNewCell;
-    [HistoryMessages.SendInfo]: IHistoryInfo;
-    [HistoryMessages.Started]: never | undefined;
-    [HistoryMessages.AddedSysInfo]: IAddedSysInfo;
-    [HistoryMessages.RemoteAddCode]: IRemoteAddCode;
+    public [HistoryMessages.StartCell]: ICell;
+    public [HistoryMessages.FinishCell]: ICell;
+    public [HistoryMessages.UpdateCell]: ICell;
+    public [HistoryMessages.GotoCodeCell]: IGotoCode;
+    public [HistoryMessages.RestartKernel]: never | undefined;
+    public [HistoryMessages.Export]: ICell[];
+    public [HistoryMessages.GetAllCells]: ICell;
+    public [HistoryMessages.ReturnAllCells]: ICell[];
+    public [HistoryMessages.DeleteCell]: never | undefined;
+    public [HistoryMessages.DeleteAllCells]: never | undefined;
+    public [HistoryMessages.Undo]: never | undefined;
+    public [HistoryMessages.Redo]: never | undefined;
+    public [HistoryMessages.ExpandAll]: never | undefined;
+    public [HistoryMessages.CollapseAll]: never | undefined;
+    public [HistoryMessages.StartProgress]: never | undefined;
+    public [HistoryMessages.StopProgress]: never | undefined;
+    public [HistoryMessages.Interrupt]: never | undefined;
+    public [HistoryMessages.UpdateSettings]: string;
+    public [HistoryMessages.SubmitNewCell]: ISubmitNewCell;
+    public [HistoryMessages.SendInfo]: IHistoryInfo;
+    public [HistoryMessages.Started]: never | undefined;
+    public [HistoryMessages.AddedSysInfo]: IAddedSysInfo;
+    public [HistoryMessages.RemoteAddCode]: IRemoteAddCode;
 }

@@ -4,12 +4,11 @@
 import { JSONArray, JSONObject, JSONValue } from '@phosphor/coreutils';
 import * as fs from 'fs-extra';
 import { inject, injectable } from 'inversify';
-import * as glob from 'glob';
 import * as path from 'path';
 import * as stripJsonComments from 'strip-json-comments';
 
 import { IWorkspaceService } from '../common/application/types';
-import { ICurrentProcess, ILogger } from '../common/types';
+import { ILogger } from '../common/types';
 import { EXTENSION_ROOT_DIR } from '../constants';
 import { Identifiers } from './constants';
 import { ICodeCssGenerator, IThemeFinder } from './types';
@@ -26,7 +25,6 @@ import { ICodeCssGenerator, IThemeFinder } from './types';
 export class CodeCssGenerator implements ICodeCssGenerator {
     constructor(
         @inject(IWorkspaceService) private workspaceService: IWorkspaceService,
-        @inject(ICurrentProcess) private currentProcess: ICurrentProcess,
         @inject(IThemeFinder) private themeFinder: IThemeFinder,
         @inject(ILogger) private logger: ILogger) {
     }
@@ -76,7 +74,7 @@ export class CodeCssGenerator implements ICodeCssGenerator {
         });
     }
 
-    private getScopeStyle = (tokenColors: JSONArray, scope: string, secondary?: string): { color: string, fontStyle: string } => {
+    private getScopeStyle = (tokenColors: JSONArray, scope: string, secondary?: string): { color: string; fontStyle: string } => {
         // Search through the scopes on the json object
         let match = this.matchTokenColor(tokenColors, scope);
         if (match < 0 && secondary) {
@@ -141,7 +139,7 @@ export class CodeCssGenerator implements ICodeCssGenerator {
         .cm-s-${escapedThemeName} span.cm-operator {color: ${operatorStyle.color}; font-style: ${operatorStyle.fontStyle}; }
         .cm-s-${escapedThemeName} span.cm-variable-2 {color: ${variableStyle.color}; font-style: ${variableStyle.fontStyle}; }
         .cm-s-${escapedThemeName} span.cm-variable-3, .cm-s-${theme} .cm-type {color: ${variableStyle.color}; font-style: ${variableStyle.fontStyle}; }
-        .cm-s-${escapedThemeName} span.cm-comment {color: ${commentStyle.color}; font-style: ${commentStyle.fontStyle}; } 
+        .cm-s-${escapedThemeName} span.cm-comment {color: ${commentStyle.color}; font-style: ${commentStyle.fontStyle}; }
         .cm-s-${escapedThemeName} span.cm-string {color: ${stringStyle.color}; font-style: ${stringStyle.fontStyle}; }
         .cm-s-${escapedThemeName} span.cm-string-2 {color: ${stringStyle.color}; font-style: ${stringStyle.fontStyle}; }
         .cm-s-${escapedThemeName} span.cm-builtin {color: ${builtinStyle.color}; font-style: ${builtinStyle.fontStyle}; }
@@ -175,7 +173,7 @@ export class CodeCssGenerator implements ICodeCssGenerator {
         // Might also have a 'settings' object that equates to token colors
         const settings = theme['settings'] as JSONArray;
         if (settings && settings.length > 0) {
-            return settings;        
+            return settings;
         }
 
         return [];
@@ -184,12 +182,12 @@ export class CodeCssGenerator implements ICodeCssGenerator {
     private findTokenColors = async (theme: string): Promise<JSONArray> => {
 
         try {
-            this.logger.logInformation(`Attempting search for colors ...`);
+            this.logger.logInformation('Attempting search for colors ...');
             const themeRoot = await this.themeFinder.findThemeRootJson(theme);
 
             // Use the first result if we have one
             if (themeRoot) {
-                this.logger.logInformation(`Loading colors from ${themeRoot} ...`)
+                this.logger.logInformation(`Loading colors from ${themeRoot} ...`);
 
                 // This should be the path to the file. Load it as a json object
                 const contents = await fs.readFile(themeRoot, 'utf8');

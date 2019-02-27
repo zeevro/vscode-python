@@ -9,7 +9,6 @@ import * as path from 'path';
 import * as React from 'react';
 import { SemVer } from 'semver';
 import * as TypeMoq from 'typemoq';
-import * as uuid from 'uuid/v4';
 import { CancellationToken, Disposable, TextDocument, TextEditor } from 'vscode';
 
 import {
@@ -27,6 +26,7 @@ import { noop } from '../../client/common/utils/misc';
 import { Architecture } from '../../client/common/utils/platform';
 import { EditorContexts } from '../../client/datascience/constants';
 import { HistoryMessageListener } from '../../client/datascience/historyMessageListener';
+import { HistoryMessages } from '../../client/datascience/historyTypes';
 import { IHistory, IHistoryProvider, IJupyterExecution } from '../../client/datascience/types';
 import { InterpreterType, PythonInterpreter } from '../../client/interpreter/contracts';
 import { CellButton } from '../../datascience-ui/history-react/cellButton';
@@ -37,7 +37,6 @@ import { sleep } from '../core';
 import { DataScienceIocContainer } from './dataScienceIocContainer';
 import { SupportedCommands } from './mockJupyterManager';
 import { blurWindow, createInputEvent, createKeyboardEvent, waitForUpdate } from './reactHelpers';
-import { HistoryMessages } from '../../client/datascience/historyTypes';
 
 //tslint:disable:trailing-comma no-any no-multiline-string
 enum CellInputState {

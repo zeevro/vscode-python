@@ -8,7 +8,7 @@ import * as uuid from 'uuid/v4';
 import { Position, Range, TextDocument, Uri, ViewColumn } from 'vscode';
 import { CancellationToken, CancellationTokenSource } from 'vscode-jsonrpc';
 
-import { IApplicationShell, IDocumentManager, ICommandManager } from '../common/application/types';
+import { IApplicationShell, ICommandManager, IDocumentManager } from '../common/application/types';
 import { CancellationError } from '../common/cancellation';
 import { PYTHON_LANGUAGE } from '../common/constants';
 import { IFileSystem } from '../common/platform/types';
@@ -115,6 +115,14 @@ export class HistoryCommandListener implements IDataScienceCommandListener {
         }
     }
 
+    private showInformationMessage(message: string, question?: string) : Thenable<string | undefined> {
+        if (question) {
+            return this.applicationShell.showInformationMessage(message, question);
+        } else {
+            return this.applicationShell.showInformationMessage(message);
+        }
+    }
+
     @captureTelemetry(Telemetry.ExportPythonFile, undefined, false)
     private async exportFile(file: string): Promise<void> {
         if (file && file.length > 0) {
@@ -149,7 +157,7 @@ export class HistoryCommandListener implements IDataScienceCommandListener {
                     // When all done, show a notice that it completed.
                     const openQuestion = (await this.jupyterExecution.isSpawnSupported()) ? localize.DataScience.exportOpenQuestion() : undefined;
                     if (uri && uri.fsPath) {
-                        this.applicationShell.showInformationMessage(localize.DataScience.exportDialogComplete().format(uri.fsPath), openQuestion).then((str: string | undefined) => {
+                        this.showInformationMessage(localize.DataScience.exportDialogComplete().format(uri.fsPath), openQuestion).then((str: string | undefined) => {
                             if (str === openQuestion) {
                                 // If the user wants to, open the notebook they just generated.
                                 this.jupyterExecution.spawnNotebook(uri.fsPath).ignoreErrors();
@@ -184,7 +192,7 @@ export class HistoryCommandListener implements IDataScienceCommandListener {
                                 return this.exportCellsWithOutput(ranges, activeEditor.document, output, cancelSource.token);
                             } catch (err) {
                                 if (!(err instanceof CancellationError)) {
-                                    this.applicationShell.showInformationMessage(localize.DataScience.exportDialogFailed().format(err));
+                                    this.showInformationMessage(localize.DataScience.exportDialogFailed().format(err));
                                 }
                             }
                             return Promise.resolve();
@@ -194,7 +202,7 @@ export class HistoryCommandListener implements IDataScienceCommandListener {
 
                         // When all done, show a notice that it completed.
                         const openQuestion = (await this.jupyterExecution.isSpawnSupported()) ? localize.DataScience.exportOpenQuestion() : undefined;
-                        this.applicationShell.showInformationMessage(localize.DataScience.exportDialogComplete().format(output), openQuestion).then((str: string | undefined) => {
+                        this.showInformationMessage(localize.DataScience.exportDialogComplete().format(output), openQuestion).then((str: string | undefined) => {
                             if (str === openQuestion && output) {
                                 // If the user wants to, open the notebook they just generated.
                                 this.jupyterExecution.spawnNotebook(output).ignoreErrors();

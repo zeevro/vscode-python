@@ -7,7 +7,7 @@ import * as vsls from 'vsls/vscode';
 
 import { ILiveShareApi } from '../../common/application/types';
 import { IAsyncDisposable } from '../../common/types';
-import { LiveShare, RegExpValues } from '../constants';
+import { LiveShare } from '../constants';
 
 // tslint:disable:no-any
 

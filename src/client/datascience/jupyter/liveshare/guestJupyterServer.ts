@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 'use strict';
 import { Observable } from 'rxjs/Observable';
-import { Subscriber } from 'rxjs/Subscriber';
 import { CancellationToken } from 'vscode-jsonrpc';
 import * as vsls from 'vsls/vscode';
 
@@ -22,13 +21,8 @@ import {
     InterruptResult
 } from '../../types';
 import { LiveShareParticipantDefault, LiveShareParticipantGuest } from './liveShareParticipantMixin';
-import {
-    IExecuteObservableResponse,
-    ILiveShareParticipant,
-    IServerResponse,
-    ServerResponseType
-} from './types';
 import { ResponseQueue } from './responseQueue';
+import { ILiveShareParticipant, IServerResponse } from './types';
 
 export class GuestJupyterServer
     extends LiveShareParticipantGuest(LiveShareParticipantDefault, LiveShare.JupyterServerSharedService)
@@ -104,7 +98,11 @@ export class GuestJupyterServer
 
     public executeObservable(code: string, file: string, line: number, id: string): Observable<ICell[]> {
         // Mimic this to the other side and then wait for a response
-        this.waitForService().then(s => s.notify(LiveShareCommands.executeObservable, { code, file, line, id }));
+        this.waitForService().then(s => {
+            if (s) {
+                s.notify(LiveShareCommands.executeObservable, { code, file, line, id });
+            }
+        }).ignoreErrors();
         return this.responseQueue.waitForObservable(code, file, line, id);
     }
 
@@ -139,7 +137,7 @@ export class GuestJupyterServer
         const launchInfo = await this.waitForConnect();
 
         // Use our base name plus our purpose. This means one unique server per purpose
-        return LiveShare.JupyterServerSharedService + launchInfo.purpose;
+        return LiveShare.JupyterServerSharedService + (launchInfo ? launchInfo.purpose : '');
     }
 
     public async getSysInfo() : Promise<ICell | undefined> {
@@ -178,9 +176,12 @@ export class GuestJupyterServer
         }
     }
 
+    // tslint:disable-next-line:no-any
     private async sendRequest(command: string, args: any[]) : Promise<any> {
         const service = await this.waitForService();
-        return service.request(command, args);
+        if (service) {
+            return service.request(command, args);
+        }
     }
 
 }

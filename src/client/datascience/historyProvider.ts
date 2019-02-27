@@ -1,16 +1,16 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 'use strict';
-import * as uuid from 'uuid/v4';
 import { inject, injectable } from 'inversify';
+import * as uuid from 'uuid/v4';
 
-import { IDisposableRegistry, IAsyncDisposable, IAsyncDisposableRegistry, IConfigurationService } from '../common/types';
-import { IServiceContainer } from '../ioc/types';
-import { IHistory, IHistoryProvider, INotebookServerOptions, IThemeFinder } from './types';
-import { PostOffice } from './liveshare/postOffice';
 import { ILiveShareApi, IWorkspaceService } from '../common/application/types';
-import { LiveShare, LiveShareCommands, Settings, Identifiers } from './constants';
-import { Deferred, createDeferred } from '../common/utils/async';
+import { IAsyncDisposable, IAsyncDisposableRegistry, IConfigurationService, IDisposableRegistry } from '../common/types';
+import { createDeferred, Deferred } from '../common/utils/async';
+import { IServiceContainer } from '../ioc/types';
+import { Identifiers, LiveShare, LiveShareCommands, Settings } from './constants';
+import { PostOffice } from './liveshare/postOffice';
+import { IHistory, IHistoryProvider, INotebookServerOptions, IThemeFinder } from './types';
 
 @injectable()
 export class HistoryProvider implements IHistoryProvider, IAsyncDisposable {
@@ -20,7 +20,7 @@ export class HistoryProvider implements IHistoryProvider, IAsyncDisposable {
     private id: string;
     private pendingSyncs : { [key: string] : { waitable: Deferred<void>; count: number }} = {};
     constructor(
-        @inject(ILiveShareApi) private liveShare: ILiveShareApi,
+        @inject(ILiveShareApi) liveShare: ILiveShareApi,
         @inject(IServiceContainer) private serviceContainer: IServiceContainer,
         @inject(IAsyncDisposableRegistry) asyncRegistry : IAsyncDisposableRegistry,
         @inject(IDisposableRegistry) private disposables: IDisposableRegistry,
@@ -67,7 +67,7 @@ export class HistoryProvider implements IHistoryProvider, IAsyncDisposable {
         let serverURI: string | undefined = settings.datascience.jupyterServerURI;
         const useDefaultConfig: boolean | undefined = settings.datascience.useDefaultConfigForJupyter;
         // Check for dark theme, if so set matplot lib to use dark_background settings
-        let darkTheme: boolean = false;
+        let darkTheme: boolean | undefined = false;
         const workbench = this.workspaceService.getConfiguration('workbench');
         if (workbench) {
             const theme = workbench.get<string>('colorTheme');
@@ -89,7 +89,6 @@ export class HistoryProvider implements IHistoryProvider, IAsyncDisposable {
         };
     }
 
-
     public dispose() : Promise<void> {
         return this.postOffice.dispose();
     }
@@ -110,6 +109,7 @@ export class HistoryProvider implements IHistoryProvider, IAsyncDisposable {
         }
     }
 
+    // tslint:disable-next-line:no-any
     private onRemoteCreate(...args: any[]) {
         // Should be a single arg, the originator of the create
         if (args.length > 0 && args[0].toString() !== this.id) {
@@ -120,10 +120,11 @@ export class HistoryProvider implements IHistoryProvider, IAsyncDisposable {
             }
 
             // Tell the requestor that we got its message (it should be waiting for all peers to sync)
-            this.postOffice.postCommand(LiveShareCommands.historyCreateSync, ...args);
+            this.postOffice.postCommand(LiveShareCommands.historyCreateSync, ...args).ignoreErrors();
         }
     }
 
+    // tslint:disable-next-line:no-any
     private onRemoteSync(...args: any[]) {
         // Should be a single arg, the originator of the create
         if (args.length > 1 && args[0].toString() === this.id) {
@@ -152,7 +153,7 @@ export class HistoryProvider implements IHistoryProvider, IAsyncDisposable {
             this.pendingSyncs[key] = { count: this.postOffice.peerCount, waitable };
 
             // Make sure all providers have an active history
-            this.postOffice.postCommand(LiveShareCommands.historyCreate, this.id, key);
+            this.postOffice.postCommand(LiveShareCommands.historyCreate, this.id, key).ignoreErrors();
 
             // Wait for the waitable to be signaled or the peer count on the post office to change
             return waitable.promise;

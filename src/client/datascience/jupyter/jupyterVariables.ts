@@ -1,18 +1,17 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
-
 'use strict';
 
 import { nbformat } from '@jupyterlab/coreutils';
 import { inject, injectable } from 'inversify';
 import * as path from 'path';
 import * as uuid from 'uuid/v4';
+
 import { IFileSystem } from '../../common/platform/types';
 import * as localize from '../../common/utils/localize';
 import { EXTENSION_ROOT_DIR } from '../../constants';
 import { Identifiers } from '../constants';
-import { ICell, IJupyterVariable, IJupyterVariables, IJupyterExecution, INotebookServerOptions, IHistoryProvider } from '../types';
-import { IConfigurationService } from '../../common/types';
+import { ICell, IHistoryProvider, IJupyterExecution, IJupyterVariable, IJupyterVariables } from '../types';
 
 @injectable()
 export class JupyterVariables implements IJupyterVariables {

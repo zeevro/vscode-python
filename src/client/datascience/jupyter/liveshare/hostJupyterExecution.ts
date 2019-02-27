@@ -3,19 +3,17 @@
 'use strict';
 import '../../../common/extensions';
 
-import * as os from 'os';
-import { CancellationToken, Disposable } from 'vscode';
+import { CancellationToken } from 'vscode';
 import * as vsls from 'vsls/vscode';
 
 import { ILiveShareApi, IWorkspaceService } from '../../../common/application/types';
 import { IFileSystem } from '../../../common/platform/types';
 import { IProcessServiceFactory, IPythonExecutionFactory } from '../../../common/process/types';
 import { IAsyncDisposableRegistry, IConfigurationService, IDisposableRegistry, ILogger } from '../../../common/types';
-import * as localize from '../../../common/utils/localize';
 import { noop } from '../../../common/utils/misc';
 import { IInterpreterService, IKnownSearchPathsForInterpreters } from '../../../interpreter/contracts';
 import { IServiceContainer } from '../../../ioc/types';
-import { LiveShare, LiveShareCommands, RegExpValues } from '../../constants';
+import { LiveShare, LiveShareCommands } from '../../constants';
 import {
     IConnection,
     IJupyterCommandFactory,
@@ -86,7 +84,7 @@ export class HostJupyterExecution
 
             // Save in our cache
             if (result) {
-                this.serverCache.set(result, noop, options);
+                await this.serverCache.set(result, noop, options);
             }
             return result;
         }

@@ -49,7 +49,6 @@ export namespace RegExpValues {
     export const ArgsSplitterRegEx = /([^\s,]+)/g;
 }
 
-
 export enum Telemetry {
     ImportNotebook = 'DATASCIENCE.IMPORT_NOTEBOOK',
     RunCell = 'DATASCIENCE.RUN_CELL',

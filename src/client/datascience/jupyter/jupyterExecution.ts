@@ -118,7 +118,7 @@ export class JupyterExecutionBase implements IJupyterExecution {
 
             // If our uri is undefined or if it's set to local launch we need to launch a server locally
             if (!options || !options.uri) {
-                const launchResults = await this.startNotebookServer(options && options.useDefaultConfig, cancelToken);
+                const launchResults = await this.startNotebookServer(options && options.useDefaultConfig ? true : false, cancelToken);
                 if (launchResults) {
                     connection = launchResults.connection;
                     kernelSpec = launchResults.kernelSpec;
@@ -154,10 +154,10 @@ export class JupyterExecutionBase implements IJupyterExecution {
                     connectionInfo: connection,
                     currentInterpreter: info,
                     kernelSpec: kernelSpec,
-                    usingDarkTheme: options && options.usingDarkTheme,
+                    usingDarkTheme: options && options.usingDarkTheme ? options.usingDarkTheme : false,
                     workingDir: options ? options.workingDir : undefined,
                     uri: options ? options.uri : undefined,
-                    purpose: options? options.purpose : uuid()
+                    purpose: options ? options.purpose : uuid()
                 };
                 await result.connect(launchInfo, cancelToken);
                 sendTelemetryEvent(launchInfo.uri ? Telemetry.ConnectRemoteJupyter : Telemetry.ConnectLocalJupyter);

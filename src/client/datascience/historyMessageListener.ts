@@ -2,13 +2,14 @@
 // Licensed under the MIT License.
 'use strict';
 import '../common/extensions';
+
 import * as vscode from 'vscode';
 import * as vsls from 'vsls/vscode';
 
 import { ILiveShareApi, IWebPanelMessageListener } from '../common/application/types';
-import { LiveShare, Identifiers } from './constants';
+import { Identifiers, LiveShare } from './constants';
+import { HistoryMessages, HistoryRemoteMessages } from './historyTypes';
 import { PostOffice } from './liveshare/postOffice';
-import { HistoryRemoteMessages, HistoryMessages } from './historyTypes';
 
 // tslint:disable:no-any
 
@@ -81,7 +82,7 @@ export class HistoryMessageListener implements IWebPanelMessageListener {
                             }
                         }
                     }
-                })
+                });
             }
         }
     }

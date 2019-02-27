@@ -14,7 +14,14 @@ import { IAsyncDisposableRegistry, IConfigurationService, IDisposableRegistry, I
 import * as localize from '../../../common/utils/localize';
 import { Identifiers, LiveShare, LiveShareCommands, RegExpValues } from '../../constants';
 import { IExecuteInfo } from '../../historyTypes';
-import { ICell, IDataScience, IJupyterSessionManager, INotebookServer, InterruptResult, INotebookServerLaunchInfo } from '../../types';
+import {
+    ICell,
+    IDataScience,
+    IJupyterSessionManager,
+    INotebookServer,
+    INotebookServerLaunchInfo,
+    InterruptResult
+} from '../../types';
 import { JupyterServerBase } from '../jupyterServer';
 import { LiveShareParticipantHost } from './liveShareParticipantMixin';
 import { ResponseQueue } from './responseQueue';
@@ -72,8 +79,8 @@ export class HostJupyterServer
                 // Requests return arrays
                 service.onRequest(LiveShareCommands.syncRequest, (args: any[], cancellation: CancellationToken) => this.onSync());
                 service.onRequest(LiveShareCommands.getSysInfo, (args:  any[], cancellation: CancellationToken) => this.onGetSysInfoRequest(cancellation));
-                service.onRequest(LiveShareCommands.restart, (args:  any[], cancellation: CancellationToken) => this.onRestartRequest(cancellation))
-                service.onRequest(LiveShareCommands.interrupt, (args:  any[], cancellation: CancellationToken) => this.onInterruptRequest(args.length > 0 ? args[0] as number : LiveShare.InterruptDefaultTimeout, cancellation))
+                service.onRequest(LiveShareCommands.restart, (args:  any[], cancellation: CancellationToken) => this.onRestartRequest(cancellation));
+                service.onRequest(LiveShareCommands.interrupt, (args:  any[], cancellation: CancellationToken) => this.onInterruptRequest(args.length > 0 ? args[0] as number : LiveShare.InterruptDefaultTimeout, cancellation));
 
                 // Notifications are always objects.
                 service.onNotify(LiveShareCommands.catchupRequest, (args: object) => this.onCatchupRequest(args));
@@ -88,7 +95,7 @@ export class HostJupyterServer
 
     public async onDetach(api: vsls.LiveShare | null) : Promise<void> {
         await super.onDetach(api);
-        
+
         // Make sure to unshare our port
         if (api && this.sharedPort) {
             this.sharedPort.dispose();
@@ -101,7 +108,7 @@ export class HostJupyterServer
         const launchInfo = await this.waitForConnect();
 
         // Use our base name plus our purpose. This means one unique server per purpose
-        return LiveShare.JupyterServerSharedService + launchInfo.purpose;
+        return LiveShare.JupyterServerSharedService + (launchInfo ? launchInfo.purpose : '');
     }
 
     public async onPeerChange(ev: vsls.PeersChangeEvent) : Promise<void> {
@@ -124,7 +131,7 @@ export class HostJupyterServer
 
                 // Cleanup old requests
                 const now = Date.now();
-                for (let [k, val] of this.requestLog) {
+                for (const [k, val] of this.requestLog) {
                     if (now - val > LiveShare.ResponseLifetime) {
                         this.requestLog.delete(k);
                     }
@@ -151,17 +158,15 @@ export class HostJupyterServer
 
     public async interruptKernel(timeoutMs: number): Promise<InterruptResult> {
         try {
-            const time = Date.now();
-            const result = await super.interruptKernel(timeoutMs);
-            return result;
+            return super.interruptKernel(timeoutMs);
         } catch (exc) {
             this.postException(exc);
             throw exc;
         }
     }
 
-    private async attemptToForwardPort(api: vsls.LiveShare | null, port: number) : Promise<void> {
-        if (port != 0 && api && api.session && api.session.role === vsls.Role.Host) {
+    private async attemptToForwardPort(api: vsls.LiveShare | null | undefined, port: number) : Promise<void> {
+        if (port !== 0 && api && api.session && api.session.role === vsls.Role.Host) {
             this.portToForward = 0;
             this.sharedPort = await api.shareServer({port, displayName: localize.DataScience.liveShareHostFormat().format(os.hostname())});
         } else {

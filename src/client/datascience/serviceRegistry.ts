@@ -17,6 +17,7 @@ import { JupyterServerFactory } from './jupyter/jupyterServerFactory';
 import { JupyterSessionManager } from './jupyter/jupyterSessionManager';
 import { JupyterVariables } from './jupyter/jupyterVariables';
 import { StatusProvider } from './statusProvider';
+import { ThemeFinder } from './themeFinder';
 import {
     ICodeCssGenerator,
     ICodeWatcher,
@@ -35,7 +36,6 @@ import {
     IStatusProvider,
     IThemeFinder
 } from './types';
-import { ThemeFinder } from './themeFinder';
 
 export function registerTypes(serviceManager: IServiceManager) {
     serviceManager.addSingleton<IDataScienceCodeLensProvider>(IDataScienceCodeLensProvider, DataScienceCodeLensProvider);

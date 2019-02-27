@@ -5,7 +5,6 @@
 // Disable whitespace / multiline as we use that to pass in our fake file strings
 import { expect } from 'chai';
 import * as TypeMoq from 'typemoq';
-import * as uuid from 'uuid/v4';
 import { CancellationTokenSource, CodeLens, Range, Selection, TextEditor } from 'vscode';
 
 import { IApplicationShell, IDocumentManager } from '../../../client/common/application/types';
@@ -19,6 +18,8 @@ import { ICodeWatcher, IHistory, IHistoryProvider } from '../../../client/datasc
 import { IServiceContainer } from '../../../client/ioc/types';
 import { MockAutoSelectionService } from '../../mocks/autoSelector';
 import { createDocument } from './helpers';
+
+//tslint:disable:no-any
 
 suite('DataScience Code Watcher Unit Tests', () => {
     let codeWatcher: CodeWatcher;

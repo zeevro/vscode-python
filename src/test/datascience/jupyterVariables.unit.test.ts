@@ -1,17 +1,17 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
-
 'use strict';
 
-// tslint:disable:no-any max-func-body-length
 import { nbformat } from '@jupyterlab/coreutils';
 import * as assert from 'assert';
 import * as typemoq from 'typemoq';
+
 import { IFileSystem } from '../../client/common/platform/types';
 import { Identifiers } from '../../client/datascience/constants';
 import { JupyterVariables } from '../../client/datascience/jupyter/jupyterVariables';
-import { CellState, ICell, INotebookServer, IJupyterExecution, IHistoryProvider, IHistory } from '../../client/datascience/types';
+import { CellState, ICell, IHistoryProvider, IJupyterExecution, INotebookServer } from '../../client/datascience/types';
 
+// tslint:disable:no-any max-func-body-length
 suite('JupyterVariables', () => {
     let execution: typemoq.IMock<IJupyterExecution>;
     let historyProvider: typemoq.IMock<IHistoryProvider>;

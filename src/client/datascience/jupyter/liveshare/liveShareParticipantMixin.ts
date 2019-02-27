@@ -107,6 +107,7 @@ function LiveShareParticipantMixin<T extends ClassType<IAsyncDisposable>, S>(
             if (api && this.serviceFullName && api.session && api.session.role === vsls.Role.Host) {
                 return api.unshareService(this.serviceFullName);
             }
+            return Promise.resolve();
         }
 
         public async onSessionChange(api: vsls.LiveShare | null) : Promise<void> {

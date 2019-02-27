@@ -6,22 +6,18 @@ import * as glob from 'glob';
 import { inject, injectable } from 'inversify';
 import * as path from 'path';
 
-import { IWorkspaceService } from '../common/application/types';
-import { ICurrentProcess, ILogger, IExtensions } from '../common/types';
-import { EXTENSION_ROOT_DIR } from '../constants';
-import { ITestResultsService } from '../unittests/common/types';
-import { PVSC_EXTENSION_ID } from '../common/constants';
+import { ICurrentProcess, IExtensions, ILogger } from '../common/types';
 
 // tslint:disable:no-any
 
 interface IThemeData {
-    rootFile: string,
-    isDark : boolean
+    rootFile: string;
+    isDark : boolean;
 }
 
 @injectable()
 export class ThemeFinder {
-    private themeCache : { [key: string] : IThemeData } = {};
+    private themeCache : { [key: string] : IThemeData | undefined } = {};
 
     constructor(
         @inject(IExtensions) private extensions: IExtensions,
@@ -62,10 +58,10 @@ export class ThemeFinder {
     }
 
     private async findMatchingTheme(themeName: string) : Promise<IThemeData | undefined> {
-        // Look through all extensions to find the theme. This will search 
+        // Look through all extensions to find the theme. This will search
         // the default extensions folder and our installed extensions.
         const extensions = this.extensions.all;
-        for (let e of extensions) {
+        for (const e of extensions) {
             const result = await this.findMatchingThemeFromJson(path.join(e.extensionPath, 'package.json'), themeName);
             if (result) {
                 return result;
@@ -87,11 +83,6 @@ export class ThemeFinder {
         if (others && others.length > 0) {
             return others[0];
         }
-        
-    }
-
-    private escapeThemeName(themeName: string) : string {
-        return themeName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
     }
 
     private async findMatchingThemes(rootPath: string, themeName: string) : Promise<IThemeData[]> {
@@ -109,7 +100,7 @@ export class ThemeFinder {
         });
         if (foundPackages.length > 0) {
             // For each one, open it up and look for the theme name.
-            for (let f of foundPackages) {
+            for (const f of foundPackages) {
                 const fpath = path.join(rootPath, f);
                 const data = await this.findMatchingThemeFromJson(fpath, themeName);
                 if (data) {
@@ -132,8 +123,8 @@ export class ThemeFinder {
             if (contributes.hasOwnProperty('themes')) {
                 const themes = contributes['themes'] as any[];
                 // Go through each theme, seeing if the label matches our theme name
-                for (let t of themes) {
-                    if ((t.hasOwnProperty('label') && t['label'] === themeName) || 
+                for (const t of themes) {
+                    if ((t.hasOwnProperty('label') && t['label'] === themeName) ||
                         (t.hasOwnProperty('id') && t['id'] === themeName)) {
                         const isDark = t.hasOwnProperty('uiTheme') && t['uiTheme'] === 'vs-dark';
                         // Path is relative to the package.json file.
@@ -145,5 +136,4 @@ export class ThemeFinder {
             }
         }
     }
-
 }

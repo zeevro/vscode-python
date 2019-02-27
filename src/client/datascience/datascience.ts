@@ -5,10 +5,9 @@ import '../common/extensions';
 
 import { inject, injectable } from 'inversify';
 import { URL } from 'url';
-import * as uuid from 'uuid/v4';
 import * as vscode from 'vscode';
 
-import { IApplicationShell, IDocumentManager, ICommandManager } from '../common/application/types';
+import { IApplicationShell, ICommandManager, IDocumentManager } from '../common/application/types';
 import { PYTHON_ALLFILES, PYTHON_LANGUAGE } from '../common/constants';
 import { ContextKey } from '../common/contextKey';
 import {
@@ -24,12 +23,7 @@ import { IServiceContainer } from '../ioc/types';
 import { captureTelemetry } from '../telemetry';
 import { hasCells } from './cellFactory';
 import { Commands, EditorContexts, Settings, Telemetry } from './constants';
-import {
-    ICodeWatcher,
-    IDataScience,
-    IDataScienceCodeLensProvider,
-    IDataScienceCommandListener
-} from './types';
+import { ICodeWatcher, IDataScience, IDataScienceCodeLensProvider, IDataScienceCommandListener } from './types';
 
 @injectable()
 export class DataScience implements IDataScience {
@@ -126,6 +120,7 @@ export class DataScience implements IDataScience {
         }
     }
 
+    // tslint:disable-next-line:no-any
     public async runSelectionOrLine(... args: any[]): Promise<void> {
         this.dataScienceSurveyBanner.showBanner().ignoreErrors();
 
@@ -153,8 +148,6 @@ export class DataScience implements IDataScience {
                 break;
         }
     }
-
-    private
 
     @captureTelemetry(Telemetry.SetJupyterURIToLocal)
     private async setJupyterURIToLocal(): Promise<void> {
@@ -184,13 +177,6 @@ export class DataScience implements IDataScience {
 
         // Return null tells the dialog that our string is valid
         return null;
-    }
-
-    private extractId(...args: any[]) : string {
-        if (args && args.length > 0) {
-            return args[args.length-1].toString();
-        }
-        return uuid();
     }
 
     private onSettingsChanged = () => {
