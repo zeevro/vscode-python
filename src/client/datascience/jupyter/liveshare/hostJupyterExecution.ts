@@ -4,7 +4,6 @@
 import '../../../common/extensions';
 
 import * as os from 'os';
-import * as uuid from 'uuid/v4';
 import { CancellationToken, Disposable } from 'vscode';
 import * as vsls from 'vsls/vscode';
 
@@ -36,8 +35,6 @@ import { ServerCache } from './serverCache';
 export class HostJupyterExecution
     extends LiveShareParticipantHost(JupyterExecutionBase, LiveShare.JupyterExecutionService)
     implements IRoleBasedObject, IJupyterExecution {
-    private sharedServers: Disposable [] = [];
-    private fowardedPorts: number [] = [];
     private serverCache : ServerCache;
     constructor(
         liveShare: ILiveShareApi,
@@ -85,36 +82,11 @@ export class HostJupyterExecution
             return result;
         } else {
             // Create the server
-            let sharedServerDisposable: Disposable | undefined;
-            let port = -1;
             result = await super.connectToNotebookServer(await this.serverCache.generateDefaultOptions(options), cancelToken);
 
-            // Then using the liveshare api, port forward whatever port is being used by the server
-
-            // tslint:disable-next-line:no-suspicious-comment
-            // TODO: Liveshare can actually change this value on the guest. So on the guest side we need to listen
-            // to an event they are going to add to their api
+            // Save in our cache
             if (result) {
-                const connectionInfo = result.getConnectionInfo();
-                if (connectionInfo && connectionInfo.localLaunch) {
-                    const portMatch = RegExpValues.ExtractPortRegex.exec(connectionInfo.baseUrl);
-                    if (portMatch && portMatch.length > 1) {
-                        port = parseInt(portMatch[1], 10);
-                        sharedServerDisposable = await this.portForwardServer(port);
-                    }
-                }
-            }
-
-            if (result) {
-                // Save this result, but modify its dispose such that we
-                // can detach from the server when it goes away.
-                this.serverCache.set(result, () => {
-                    this.fowardedPorts = this.fowardedPorts.filter(p => p != port);
-                    // Dispose of the shared server
-                    if (sharedServerDisposable) {
-                        sharedServerDisposable.dispose();
-                    }
-                }, options);
+                this.serverCache.set(result, noop, options);
             }
             return result;
         }
@@ -133,19 +105,11 @@ export class HostJupyterExecution
                 service.onRequest(LiveShareCommands.connectToNotebookServer, this.onRemoteConnectToNotebookServer);
                 service.onRequest(LiveShareCommands.getUsableJupyterPython, this.onRemoteGetUsableJupyterPython);
             }
-
-            // Port forward all of the servers that need it
-            this.fowardedPorts.forEach(p => this.portForwardServer(p).ignoreErrors());
         }
     }
 
     public async onDetach(api: vsls.LiveShare | null) : Promise<void> {
         await super.onDetach(api);
-
-        // Unshare all of our port forwarded servers
-        this.sharedServers.forEach(s => s.dispose());
-        this.sharedServers = [];
-        this.fowardedPorts = [];
 
         // clear our cached servers. We need to reconnect
         await this.serverCache.dispose();
@@ -154,23 +118,6 @@ export class HostJupyterExecution
     public getServer(options?: INotebookServerOptions) : Promise<INotebookServer | undefined> {
         // See if we have this server or not.
         return this.serverCache.get(options);
-    }
-
-    private async portForwardServer(port: number) : Promise<Disposable | undefined> {
-        // Share this port with all guests if we are actively in a session. Otherwise save for when we are.
-        let result : Disposable | undefined;
-        const api = await this.api;
-        if (api && api.session && api.session.role === vsls.Role.Host) {
-            result = await api.shareServer({port, displayName: localize.DataScience.liveShareHostFormat().format(os.hostname())});
-            this.sharedServers.push(result!);
-        }
-
-        // Save for reattaching if necessary later
-        if (this.fowardedPorts.indexOf(port) === -1) {
-            this.fowardedPorts.push(port);
-        }
-
-        return result;
     }
 
     private onRemoteIsNotebookSupported = (args: any[], cancellation: CancellationToken): Promise<any> => {

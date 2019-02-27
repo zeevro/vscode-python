@@ -3,6 +3,7 @@
 'use strict';
 import '../../../common/extensions';
 
+import * as os from 'os';
 import { Observable } from 'rxjs/Observable';
 import * as vscode from 'vscode';
 import { CancellationToken } from 'vscode-jsonrpc';
@@ -10,14 +11,15 @@ import * as vsls from 'vsls/vscode';
 
 import { ILiveShareApi } from '../../../common/application/types';
 import { IAsyncDisposableRegistry, IConfigurationService, IDisposableRegistry, ILogger } from '../../../common/types';
-import { Identifiers, LiveShare, LiveShareCommands } from '../../constants';
+import * as localize from '../../../common/utils/localize';
+import { Identifiers, LiveShare, LiveShareCommands, RegExpValues } from '../../constants';
+import { IExecuteInfo } from '../../historyTypes';
 import { ICell, IDataScience, IJupyterSessionManager, INotebookServer, InterruptResult, INotebookServerLaunchInfo } from '../../types';
 import { JupyterServerBase } from '../jupyterServer';
 import { LiveShareParticipantHost } from './liveShareParticipantMixin';
-import { IRoleBasedObject } from './roleBasedFactory';
-import { IResponseMapping, IServerResponse, ServerResponseType, IExecuteObservableResponse } from './types';
 import { ResponseQueue } from './responseQueue';
-import { IExecuteInfo } from '../../historyTypes';
+import { IRoleBasedObject } from './roleBasedFactory';
+import { IResponseMapping, IServerResponse, ServerResponseType } from './types';
 
 // tslint:disable:no-any
 
@@ -28,6 +30,8 @@ export class HostJupyterServer
     private requestLog : Map<string, number> = new Map<string, number>();
     private catchupPendingCount : number = 0;
     private disposed = false;
+    private portToForward = 0;
+    private sharedPort : vscode.Disposable | undefined;
     constructor(
         liveShare: ILiveShareApi,
         dataScience: IDataScience,
@@ -48,6 +52,17 @@ export class HostJupyterServer
         }
     }
 
+    public async connect(launchInfo: INotebookServerLaunchInfo, cancelToken?: CancellationToken): Promise<void> {
+        if (launchInfo.connectionInfo && launchInfo.connectionInfo.localLaunch) {
+            const portMatch = RegExpValues.ExtractPortRegex.exec(launchInfo.connectionInfo.baseUrl);
+            if (portMatch && portMatch.length > 1) {
+                const port = parseInt(portMatch[1], 10);
+                await this.attemptToForwardPort(this.finishedApi, port);
+            }
+        }
+        return super.connect(launchInfo, cancelToken);
+    }
+
     public async onAttach(api: vsls.LiveShare | null) : Promise<void> {
         if (api && !this.disposed) {
             const service = await this.waitForService();
@@ -64,7 +79,20 @@ export class HostJupyterServer
                 service.onNotify(LiveShareCommands.catchupRequest, (args: object) => this.onCatchupRequest(args));
                 service.onNotify(LiveShareCommands.executeObservable, (args: object) => this.onExecuteObservableRequest(args));
                 service.onNotify(LiveShareCommands.disposeServer, (args: object) => this.dispose().ignoreErrors());
+
+                // See if we need to forward the port
+                await this.attemptToForwardPort(api, this.portToForward);
             }
+        }
+    }
+
+    public async onDetach(api: vsls.LiveShare | null) : Promise<void> {
+        await super.onDetach(api);
+        
+        // Make sure to unshare our port
+        if (api && this.sharedPort) {
+            this.sharedPort.dispose();
+            this.sharedPort = undefined;
         }
     }
 
@@ -129,6 +157,15 @@ export class HostJupyterServer
         } catch (exc) {
             this.postException(exc);
             throw exc;
+        }
+    }
+
+    private async attemptToForwardPort(api: vsls.LiveShare | null, port: number) : Promise<void> {
+        if (port != 0 && api && api.session && api.session.role === vsls.Role.Host) {
+            this.portToForward = 0;
+            this.sharedPort = await api.shareServer({port, displayName: localize.DataScience.liveShareHostFormat().format(os.hostname())});
+        } else {
+            this.portToForward = port;
         }
     }
 
