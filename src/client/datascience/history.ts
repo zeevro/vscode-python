@@ -350,6 +350,9 @@ export class History implements IHistory {
     private onRemoteAddedCode(args: IRemoteAddCode) {
         // Make sure this is valid
         if (args && args.id && args.file && args.originator !== this.id) {
+            // Indicate this in our telemetry.
+            sendTelemetryEvent(Telemetry.RemoteAddCode);
+
             // Submit this item as new code.
             this.submitCode(args.code, args.file, args.line, args.id).ignoreErrors();
         }
