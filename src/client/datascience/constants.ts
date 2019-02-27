@@ -135,4 +135,5 @@ export namespace LiveShareCommands {
     export const interrupt = 'interrupt';
     export const historyCreate = 'historyCreate';
     export const historyCreateSync = 'historyCreateSync';
+    export const disposeServer = 'disposeServer';
 }

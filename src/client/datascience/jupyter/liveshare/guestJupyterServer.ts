@@ -55,12 +55,11 @@ export class GuestJupyterServer
     }
 
     public async shutdown(): Promise<void> {
-        // Send this across to the other side
+        // Send this across to the other side. Otherwise the host server will remain running.
         const service = await this.waitForService();
         if (service) {
-            service.notify(LiveShareCommands.disposeServer)
+            service.notify(LiveShareCommands.disposeServer, {});
         }
-
     }
 
     public dispose(): Promise<void> {
@@ -133,6 +132,14 @@ export class GuestJupyterServer
 
     public waitForConnect(): Promise<INotebookServerLaunchInfo | undefined> {
         return this.connectPromise.promise;
+    }
+
+    public async waitForServiceName() : Promise<string> {
+        // First wait for connect to occur
+        const launchInfo = await this.waitForConnect();
+
+        // Use our base name plus our purpose. This means one unique server per purpose
+        return LiveShare.JupyterServerSharedService + launchInfo.purpose;
     }
 
     public async getSysInfo() : Promise<ICell | undefined> {

@@ -45,5 +45,5 @@ export interface ILiveShareParticipant extends IAsyncDisposable {
     onAttach(api: vsls.LiveShare | null) : Promise<void>;
     onDetach(api: vsls.LiveShare | null) : Promise<void>;
     onPeerChange(ev: vsls.PeersChangeEvent) : Promise<void>;
-    getServerName() : string;
+    waitForServiceName() : Promise<string>;
 }

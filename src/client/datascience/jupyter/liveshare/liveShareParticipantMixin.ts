@@ -98,9 +98,9 @@ function LiveShareParticipantMixin<T extends ClassType<IAsyncDisposable>, S>(
             noop();
         }
 
-        public getServerName() : string {
-            // Default is the service name
-            return serviceName;
+        public waitForServiceName() : Promise<string> {
+            // Default is just to return the server name
+            return Promise.resolve(serviceName);
         }
 
         public onDetach(api: vsls.LiveShare | null) : Promise<void> {
@@ -131,7 +131,7 @@ function LiveShareParticipantMixin<T extends ClassType<IAsyncDisposable>, S>(
             if (!api || (api.session.role !== this.wantedRole)) {
                 this.servicePromise = Promise.resolve(undefined);
             } else {
-                this.serviceFullName = this.getServerName();
+                this.serviceFullName = await this.waitForServiceName();
                 this.servicePromise = serviceWaiter(api, this.serviceFullName);
             }
 

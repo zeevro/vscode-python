@@ -63,13 +63,17 @@ export class HostJupyterServer
                 // Notifications are always objects.
                 service.onNotify(LiveShareCommands.catchupRequest, (args: object) => this.onCatchupRequest(args));
                 service.onNotify(LiveShareCommands.executeObservable, (args: object) => this.onExecuteObservableRequest(args));
+                service.onNotify(LiveShareCommands.disposeServer, (args: object) => this.dispose().ignoreErrors());
             }
         }
     }
 
-    public waitForServerName() : Promise<string> {
+    public async waitForServiceName() : Promise<string> {
+        // First wait for connect to occur
+        const launchInfo = await this.waitForConnect();
+
         // Use our base name plus our purpose. This means one unique server per purpose
-        return LiveShare.JupyterServerSharedService + this.getLaunchInfo().purpose;
+        return LiveShare.JupyterServerSharedService + launchInfo.purpose;
     }
 
     public async onPeerChange(ev: vsls.PeersChangeEvent) : Promise<void> {
