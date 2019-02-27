@@ -59,6 +59,7 @@ import {
     IAsyncDisposableRegistry,
     IConfigurationService,
     ICurrentProcess,
+    IExtensions,
     ILogger,
     IPathUtils,
     IPersistentStateFactory,
@@ -78,6 +79,7 @@ import { JupyterImporter } from '../../client/datascience/jupyter/jupyterImporte
 import { JupyterServerFactory } from '../../client/datascience/jupyter/jupyterServerFactory';
 import { JupyterSessionManager } from '../../client/datascience/jupyter/jupyterSessionManager';
 import { StatusProvider } from '../../client/datascience/statusProvider';
+import { ThemeFinder } from '../../client/datascience/themeFinder';
 import {
     ICodeCssGenerator,
     IDataScience,
@@ -89,7 +91,8 @@ import {
     INotebookExporter,
     INotebookImporter,
     INotebookServer,
-    IStatusProvider
+    IStatusProvider,
+    IThemeFinder
 } from '../../client/datascience/types';
 import { EnvironmentActivationService } from '../../client/interpreter/activation/service';
 import { IEnvironmentActivationService } from '../../client/interpreter/activation/types';
@@ -160,6 +163,7 @@ import { IVirtualEnvironmentManager } from '../../client/interpreter/virtualEnvs
 import { MockAutoSelectionService } from '../mocks/autoSelector';
 import { UnitTestIocContainer } from '../unittests/serviceRegistry';
 import { MockCommandManager } from './mockCommandManager';
+import { MockExtensions } from './mockExtensions';
 import { MockJupyterManager } from './mockJupyterManager';
 import { MockLiveShareApi } from './mockLiveShare';
 
@@ -203,8 +207,10 @@ export class DataScienceIocContainer extends UnitTestIocContainer {
         this.serviceManager.add<INotebookImporter>(INotebookImporter, JupyterImporter);
         this.serviceManager.add<INotebookExporter>(INotebookExporter, JupyterExporter);
         this.serviceManager.addSingleton<ILiveShareApi>(ILiveShareApi, MockLiveShareApi);
+        this.serviceManager.addSingleton<IExtensions>(IExtensions, MockExtensions);
         this.serviceManager.add<INotebookServer>(INotebookServer, JupyterServerFactory);
         this.serviceManager.add<IJupyterCommandFactory>(IJupyterCommandFactory, JupyterCommandFactory);
+        this.serviceManager.addSingleton<IThemeFinder>(IThemeFinder, ThemeFinder);
         this.serviceManager.addSingleton<ICodeCssGenerator>(ICodeCssGenerator, CodeCssGenerator);
         this.serviceManager.addSingleton<IStatusProvider>(IStatusProvider, StatusProvider);
         this.serviceManager.add<IKnownSearchPathsForInterpreters>(IKnownSearchPathsForInterpreters, KnownSearchPathsForInterpreters);
