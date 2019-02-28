@@ -120,7 +120,6 @@ export interface INotebookExporter extends Disposable {
 export const IHistoryProvider = Symbol('IHistoryProvider');
 export interface IHistoryProvider {
     getActive() : IHistory | undefined;
-
     getOrCreateActive(): Promise<IHistory>;
     getNotebookOptions() : Promise<INotebookServerOptions>;
 }

@@ -447,6 +447,10 @@ export class DataScienceIocContainer extends UnitTestIocContainer {
         return this.jupyterMock;
     }
 
+    public get<T>(typeName: string) : T {
+        return this.serviceManager.get<T>(typeName);
+    }
+
     private findPythonPath(): string {
         try {
             const output = child_process.execFileSync('python', ['-c', 'import sys;print(sys.executable)'], { encoding: 'utf8' });

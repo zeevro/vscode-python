@@ -30,39 +30,30 @@ export declare function acquireVsCodeApi(): IVsCodeApi;
 
 export class PostOffice extends React.Component<IPostOfficeProps> {
 
-    private static vscodeApi : IVsCodeApi | undefined;
+    private vscodeApi : IVsCodeApi | undefined;
     private registered: boolean = false;
 
     constructor(props: IPostOfficeProps) {
         super(props);
     }
 
-    public static canSendMessages() {
-        if (PostOffice.acquireApi()) {
-            return true;
-        }
-        return false;
-    }
-
-    public static sendMessage<M extends IHistoryMapping, T extends keyof M>(type: T, payload?: M[T]) {
-        if (PostOffice.canSendMessages()) {
-            const api = PostOffice.acquireApi();
-            if (api) {
-                api.postMessage({type: type.toString(), payload });
-            }
+    public sendMessage<M extends IHistoryMapping, T extends keyof M>(type: T, payload?: M[T]) {
+        const api = this.acquireApi();
+        if (api) {
+            api.postMessage({ type: type.toString(), payload });
         }
     }
 
-    private static acquireApi() : IVsCodeApi | undefined {
+    private acquireApi() : IVsCodeApi | undefined {
 
         // Only do this once as it crashes if we ask more than once
-        if (!PostOffice.vscodeApi &&
+        if (!this.vscodeApi &&
             // tslint:disable-next-line:no-typeof-undefined
             typeof acquireVsCodeApi !== 'undefined') {
-            PostOffice.vscodeApi = acquireVsCodeApi();
+            this.vscodeApi = acquireVsCodeApi();
         }
 
-        return PostOffice.vscodeApi;
+        return this.vscodeApi;
     }
 
     public componentDidMount() {

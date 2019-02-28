@@ -871,3 +871,9 @@ export const ILiveShareApi = Symbol('ILiveShareApi');
 export interface ILiveShareApi {
     getApi(): Promise<vsls.LiveShare | null>;
 }
+
+// Wraps the liveshare api for testing
+export const ILiveShareTestingApi = Symbol('ILiveShareTestingApi');
+export interface ILiveShareTestingApi extends ILiveShareApi {
+    forceRole(role: vsls.Role);
+}
