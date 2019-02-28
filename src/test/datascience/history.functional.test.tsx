@@ -175,7 +175,7 @@ suite('History output tests', () => {
     }
 
     runMountedTest('Simple text', async (wrapper) => {
-        await addCode(await getOrCreateHistory(), wrapper, 'a=1\na');
+        await addCode(getOrCreateHistory, wrapper, 'a=1\na');
 
         verifyHtmlOnCell(wrapper, '<span>1</span>', CellPosition.Last);
     });
@@ -183,13 +183,13 @@ suite('History output tests', () => {
     runMountedTest('Hide inputs', async (wrapper) => {
         initialDataScienceSettings({ ...defaultDataScienceSettings(), showCellInputCode: false });
 
-        await addCode(await getOrCreateHistory(), wrapper, 'a=1\na');
+        await addCode(getOrCreateHistory, wrapper, 'a=1\na');
 
         verifyLastCellInputState(wrapper, CellInputState.Hidden);
 
         // Add a cell without output, this cell should not show up at all
         addMockData(ioc, 'a=1', undefined, 'text/plain');
-        await addCode(await getOrCreateHistory(), wrapper, 'a=1', 4);
+        await addCode(getOrCreateHistory, wrapper, 'a=1', 4);
 
         verifyHtmlOnCell(wrapper, '<span>1</span>', CellPosition.First);
         verifyHtmlOnCell(wrapper, undefined, CellPosition.Last);
@@ -198,7 +198,7 @@ suite('History output tests', () => {
     runMountedTest('Show inputs', async (wrapper) => {
         initialDataScienceSettings({ ...defaultDataScienceSettings() });
 
-        await addCode(await getOrCreateHistory(), wrapper, 'a=1\na');
+        await addCode(getOrCreateHistory, wrapper, 'a=1\na');
 
         verifyLastCellInputState(wrapper, CellInputState.Visible);
         verifyLastCellInputState(wrapper, CellInputState.Collapsed);
@@ -206,14 +206,14 @@ suite('History output tests', () => {
 
     runMountedTest('Expand inputs', async (wrapper) => {
         initialDataScienceSettings({ ...defaultDataScienceSettings(), collapseCellInputCodeByDefault: false });
-        await addCode(await getOrCreateHistory(), wrapper, 'a=1\na');
+        await addCode(getOrCreateHistory, wrapper, 'a=1\na');
 
         verifyLastCellInputState(wrapper, CellInputState.Expanded);
     });
 
     runMountedTest('Collapse / expand cell', async (wrapper) => {
         initialDataScienceSettings({ ...defaultDataScienceSettings() });
-        await addCode(await getOrCreateHistory(), wrapper, 'a=1\na');
+        await addCode(getOrCreateHistory, wrapper, 'a=1\na');
 
         verifyLastCellInputState(wrapper, CellInputState.Visible);
         verifyLastCellInputState(wrapper, CellInputState.Collapsed);
@@ -231,7 +231,7 @@ suite('History output tests', () => {
 
     runMountedTest('Hide / show cell', async (wrapper) => {
         initialDataScienceSettings({ ...defaultDataScienceSettings() });
-        await addCode(await getOrCreateHistory(), wrapper, 'a=1\na');
+        await addCode(getOrCreateHistory, wrapper, 'a=1\na');
 
         verifyLastCellInputState(wrapper, CellInputState.Visible);
         verifyLastCellInputState(wrapper, CellInputState.Collapsed);
@@ -289,16 +289,16 @@ for _ in range(50):
             return Promise.resolve({ result: result, haveMore: loops > 0 });
         });
 
-        await addCode(await getOrCreateHistory(), wrapper, badPanda, 4);
+        await addCode(getOrCreateHistory, wrapper, badPanda, 4);
         verifyHtmlOnCell(wrapper, `has no attribute 'read'`, CellPosition.Last);
 
-        await addCode(await getOrCreateHistory(), wrapper, goodPanda);
+        await addCode(getOrCreateHistory, wrapper, goodPanda);
         verifyHtmlOnCell(wrapper, `<td>`, CellPosition.Last);
 
-        await addCode(await getOrCreateHistory(), wrapper, matPlotLib);
+        await addCode(getOrCreateHistory, wrapper, matPlotLib);
         verifyHtmlOnCell(wrapper, matPlotLibResults, CellPosition.Last);
 
-        await addCode(await getOrCreateHistory(), wrapper, spinningCursor, 4 + (ioc.mockJupyter ? (cursors.length * 3) : 0));
+        await addCode(getOrCreateHistory, wrapper, spinningCursor, 4 + (ioc.mockJupyter ? (cursors.length * 3) : 0));
         verifyHtmlOnCell(wrapper, '<xmp>', CellPosition.Last);
     });
 
@@ -306,7 +306,7 @@ for _ in range(50):
         const history = await getOrCreateHistory();
 
         // Get a cell into the list
-        await addCode(await getOrCreateHistory(), wrapper, 'a=1\na');
+        await addCode(getOrCreateHistory, wrapper, 'a=1\na');
 
         // Now verify if we undo, we have no cells
         let afterUndo = await getCellResults(wrapper, 1, () => {
@@ -324,7 +324,7 @@ for _ in range(50):
         assert.equal(afterRedo.length, 2, 'Redo should put cells back');
 
         // Get another cell into the list
-        const afterAdd = await addCode(await getOrCreateHistory(), wrapper, 'a=1\na');
+        const afterAdd = await addCode(getOrCreateHistory, wrapper, 'a=1\na');
         assert.equal(afterAdd.length, 3, 'Second cell did not get added');
 
         // Clear everything
@@ -359,7 +359,7 @@ for _ in range(50):
         ioc.serviceManager.rebindInstance<IDocumentManager>(IDocumentManager, docManager.object);
 
         // Get a cell into the list
-        await addCode(await getOrCreateHistory(), wrapper, 'a=1\na');
+        await addCode(getOrCreateHistory, wrapper, 'a=1\na');
 
         // 'Click' the buttons in the react control
         const undo = findButton(wrapper, 5);
@@ -382,7 +382,7 @@ for _ in range(50):
         assert.equal(afterRedo.length, 2, 'Redo should put cells back');
 
         // Get another cell into the list
-        const afterAdd = await addCode(await getOrCreateHistory(), wrapper, 'a=1\na');
+        const afterAdd = await addCode(getOrCreateHistory, wrapper, 'a=1\na');
         assert.equal(afterAdd.length, 3, 'Second cell did not get added');
 
         // Clear everything
@@ -436,7 +436,7 @@ for _ in range(50):
         ioc.serviceManager.rebindInstance<IApplicationShell>(IApplicationShell, appShell.object);
 
         // Make sure to create the history after the rebind or it gets the wrong application shell.
-        await addCode(await getOrCreateHistory(), wrapper, 'a=1\na');
+        await addCode(getOrCreateHistory, wrapper, 'a=1\na');
         const history = await getOrCreateHistory();
 
         // Export should cause exportCalled to change to true

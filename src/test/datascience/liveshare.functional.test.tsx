@@ -39,8 +39,8 @@ import { updateSettings } from '../../datascience-ui/react-common/settingsReactS
 import { sleep } from '../core';
 import { DataScienceIocContainer } from './dataScienceIocContainer';
 import { SupportedCommands } from './mockJupyterManager';
-import { blurWindow, createInputEvent, createKeyboardEvent, waitForUpdate } from './reactHelpers';
-import { addCode, verifyHtmlOnCell } from './historyTestHelpers';
+import { blurWindow, createInputEvent, createKeyboardEvent, waitForUpdate, createMessageEvent } from './reactHelpers';
+import { addCode, verifyHtmlOnCell, addMockData } from './historyTestHelpers';
 
 //tslint:disable:trailing-comma no-any no-multiline-string
 enum CellInputState {
@@ -59,10 +59,13 @@ class ContainerData {
     public ioc: DataScienceIocContainer | undefined;
     public webPanelListener: IWebPanelMessageListener | undefined;
     public wrapper: ReactWrapper<any, Readonly<{}>, React.Component> | undefined;
-    public postMessage: ((m: WebPanelMessage) => void) | undefined;
+    public wrapperCreatedPromise : Deferred<boolean> = createDeferred<boolean>();
+    public postMessage: ((ev: MessageEvent) => void) | undefined;
 
     public dispose() {
         if (this.wrapper) {
+            // Blur window focus so we don't have editors polling
+            blurWindow();
             this.wrapper.unmount();
             this.wrapper = undefined;
         }
@@ -100,8 +103,8 @@ suite('LiveShare tests', () => {
                 }
             }
         }
-        await hostContainer.ioc.dispose();
-        await guestContainer.ioc.dispose();
+        await hostContainer.dispose();
+        await guestContainer.dispose();
     });
 
     function createContainer(role: vsls.Role) : ContainerData {
@@ -114,7 +117,7 @@ suite('LiveShare tests', () => {
         }
 
         // Force the container to mock actual live share
-        const liveShareTest = result.ioc.get<ILiveShareApi>('ILiveShareApi') as ILiveShareTestingApi;
+        const liveShareTest = result.ioc.get<ILiveShareApi>(ILiveShareApi) as ILiveShareTestingApi;
         liveShareTest.forceRole(role);
 
         const webPanelProvider = TypeMoq.Mock.ofType<IWebPanelProvider>();
@@ -127,17 +130,17 @@ suite('LiveShare tests', () => {
             // Keep track of the current listener. It listens to messages through the vscode api
             result.webPanelListener = listener;
 
-            // At this point is also where we need to mount the web panel ui so that the history
-            // object created can talk to it.
-            mountReactControl(result);
-
             // Return our dummy web panel
             return webPanel.object;
         });
         webPanel.setup(p => p.postMessage(TypeMoq.It.isAny())).callback((m: WebPanelMessage) => {
-            result.postMessage(m);
+            const message = createMessageEvent(m);
+            result.postMessage(message);
         }); 
         webPanel.setup(p => p.show());
+
+        // We need to mount the react control before we even create a history object. Otherwise the mount will miss rendering some parts
+        mountReactControl(result);
 
         return result;
     }
@@ -185,12 +188,19 @@ suite('LiveShare tests', () => {
     async function getOrCreateHistory(role: vsls.Role) : Promise<IHistory> {
         // Get the container to use based on the role. 
         const container = role === vsls.Role.Host ? hostContainer : guestContainer;
-        return container.ioc!.get<IHistoryProvider>('IHistoryProvider').getOrCreateActive();
+        const history = await container.ioc!.get<IHistoryProvider>(IHistoryProvider).getOrCreateActive();
+
+        // During testing the MainPanel sends the init message before our history is created.
+        // Pretend like it's happening now
+        const listener = ((history as any)['messageListener']) as HistoryMessageListener;
+        listener.onMessage(HistoryMessages.Started, {});
+
+        return history;
     }
 
     async function addCodeToRole(role: vsls.Role, code: string, expectedRenderCount: number = 5) : Promise<ReactWrapper<any, Readonly<{}>, React.Component>> {
         const container = role === vsls.Role.Host? hostContainer : guestContainer;
-        await addCode(await getOrCreateHistory(role), container.wrapper, code, expectedRenderCount);
+        await addCode(() => getOrCreateHistory(role), container.wrapper, code, expectedRenderCount);
         return container.wrapper;
     }
 
@@ -203,12 +213,18 @@ suite('LiveShare tests', () => {
 
 
     test('Host alone', async () => {
+        // Should only need mock data in host
+        addMockData(hostContainer.ioc, 'a=1\na', 1);
+
         // Just run some code in the host 
         const wrapper = await addCodeToRole(vsls.Role.Host, 'a=1\na');
         verifyHtmlOnCell(wrapper, '<span>1</span>', CellPosition.Last);
     });
 
     test('Host & Guest Simple', async () => {
+        // Should only need mock data in host
+        addMockData(hostContainer.ioc, 'a=1\na', 1);
+
         // Create the host history and then the guest history
         const host = await getOrCreateHistory(vsls.Role.Host);
         const guest = await getOrCreateHistory(vsls.Role.Guest);

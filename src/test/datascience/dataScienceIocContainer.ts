@@ -166,6 +166,7 @@ import { MockCommandManager } from './mockCommandManager';
 import { MockExtensions } from './mockExtensions';
 import { MockJupyterManager } from './mockJupyterManager';
 import { MockLiveShareApi } from './mockLiveShare';
+import { interfaces } from 'inversify';
 
 export class DataScienceIocContainer extends UnitTestIocContainer {
 
@@ -447,8 +448,8 @@ export class DataScienceIocContainer extends UnitTestIocContainer {
         return this.jupyterMock;
     }
 
-    public get<T>(typeName: string) : T {
-        return this.serviceManager.get<T>(typeName);
+    public get<T>(serviceIdentifier: interfaces.ServiceIdentifier<T>) : T {
+        return this.serviceManager.get<T>(serviceIdentifier);
     }
 
     private findPythonPath(): string {

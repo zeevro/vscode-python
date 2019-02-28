@@ -2,42 +2,21 @@
 // Licensed under the MIT License.
 'use strict';
 import * as assert from 'assert';
-import { mount, ReactWrapper } from 'enzyme';
-import * as vsls from 'vsls/vscode';
-import * as fs from 'fs-extra';
+import { ReactWrapper } from 'enzyme';
 import { min } from 'lodash';
 import * as path from 'path';
 import * as React from 'react';
-import { SemVer } from 'semver';
-import * as TypeMoq from 'typemoq';
-import { CancellationToken, Disposable, TextDocument, TextEditor } from 'vscode';
+import { CancellationToken } from 'vscode';
 
-import {
-    IApplicationShell,
-    IDocumentManager,
-    IWebPanel,
-    IWebPanelMessageListener,
-    IWebPanelProvider,
-    WebPanelMessage
-} from '../../client/common/application/types';
 import { EXTENSION_ROOT_DIR } from '../../client/common/constants';
 import { IDataScienceSettings } from '../../client/common/types';
-import { createDeferred, Deferred } from '../../client/common/utils/async';
-import { noop } from '../../client/common/utils/misc';
-import { Architecture } from '../../client/common/utils/platform';
-import { EditorContexts } from '../../client/datascience/constants';
-import { HistoryMessageListener } from '../../client/datascience/historyMessageListener';
 import { HistoryMessages } from '../../client/datascience/historyTypes';
-import { IHistory, IHistoryProvider, IJupyterExecution } from '../../client/datascience/types';
-import { InterpreterType, PythonInterpreter } from '../../client/interpreter/contracts';
+import { IHistory } from '../../client/datascience/types';
 import { CellButton } from '../../datascience-ui/history-react/cellButton';
 import { MainPanel } from '../../datascience-ui/history-react/MainPanel';
-import { IVsCodeApi } from '../../datascience-ui/react-common/postOffice';
 import { updateSettings } from '../../datascience-ui/react-common/settingsReactSide';
-import { sleep } from '../core';
 import { DataScienceIocContainer } from './dataScienceIocContainer';
-import { SupportedCommands } from './mockJupyterManager';
-import { blurWindow, createInputEvent, createKeyboardEvent, waitForUpdate } from './reactHelpers';
+import { createInputEvent, createKeyboardEvent, waitForRender, waitForUpdate } from './reactHelpers';
 
 //tslint:disable:trailing-comma no-any no-multiline-string
 export enum CellInputState {
@@ -169,7 +148,7 @@ export async function getCellResults(wrapper: ReactWrapper<any, Readonly<{}>, Re
     return wrapper.find('Cell');
 }
 
-export async function addCode(history: IHistory, wrapper: ReactWrapper<any, Readonly<{}>, React.Component>, code: string, expectedRenderCount: number = 5): Promise<ReactWrapper<any, Readonly<{}>, React.Component>> {
+export async function addCode(historyProvider: () => Promise<IHistory>, wrapper: ReactWrapper<any, Readonly<{}>, React.Component>, code: string, expectedRenderCount: number = 5): Promise<ReactWrapper<any, Readonly<{}>, React.Component>> {
     // Adding code should cause 5 renders to happen.
     // 1) Input
     // 2) Status ready
@@ -177,6 +156,7 @@ export async function addCode(history: IHistory, wrapper: ReactWrapper<any, Read
     // 4) Output message (if there's only one)
     // 5) Status finished
     return getCellResults(wrapper, expectedRenderCount, async () => {
+        const history = await historyProvider();
         await history.addCode(code, 'foo.py', 2);
     });
 }
