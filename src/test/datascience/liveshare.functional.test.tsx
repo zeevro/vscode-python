@@ -7,10 +7,11 @@ import * as path from 'path';
 import * as React from 'react';
 import { SemVer } from 'semver';
 import * as TypeMoq from 'typemoq';
-import { Disposable } from 'vscode';
+import { Disposable, Range, Uri } from 'vscode';
 import * as vsls from 'vsls/vscode';
 
 import {
+    ICommandManager,
     ILiveShareApi,
     ILiveShareTestingApi,
     IWebPanel,
@@ -22,15 +23,16 @@ import { createDeferred, Deferred } from '../../client/common/utils/async';
 import { Architecture } from '../../client/common/utils/platform';
 import { HistoryMessageListener } from '../../client/datascience/historyMessageListener';
 import { HistoryMessages } from '../../client/datascience/historyTypes';
-import { IHistory, IHistoryProvider } from '../../client/datascience/types';
+import { ICodeWatcher, IHistory, IHistoryProvider, IJupyterExecution } from '../../client/datascience/types';
 import { InterpreterType, PythonInterpreter } from '../../client/interpreter/contracts';
 import { MainPanel } from '../../datascience-ui/history-react/MainPanel';
 import { IVsCodeApi } from '../../datascience-ui/react-common/postOffice';
 import { DataScienceIocContainer } from './dataScienceIocContainer';
-import { addCode, addMockData, verifyHtmlOnCell, CellPosition } from './historyTestHelpers';
+import { createDocument } from './editor-integration/helpers';
+import { addMockData, CellPosition, verifyHtmlOnCell } from './historyTestHelpers';
 import { SupportedCommands } from './mockJupyterManager';
 import { blurWindow, createMessageEvent, waitForUpdate } from './reactHelpers';
-import { Container } from 'inversify';
+import { Commands } from '../../client/datascience/constants';
 
 //tslint:disable:trailing-comma no-any no-multiline-string
 
@@ -121,8 +123,9 @@ suite('LiveShare tests', () => {
         // We need to mount the react control before we even create a history object. Otherwise the mount will miss rendering some parts
         mountReactControl(result);
 
-        // Make sure the history provider in the container is created (the extension does this on startup in the extension)
+        // Make sure the history provider and execution factory in the container is created (the extension does this on startup in the extension)
         result.ioc.get<IHistoryProvider>(IHistoryProvider);
+        result.ioc.get<IJupyterExecution>(IJupyterExecution);
 
         return result;
     }
@@ -186,13 +189,19 @@ suite('LiveShare tests', () => {
         return api.isSessionStarted;
     }
 
-    async function addCodeToRole(role: vsls.Role, code: string, expectedRenderCount: number = 5) : Promise<ReactWrapper<any, Readonly<{}>, React.Component>> {
+    async function waitForResults(role: vsls.Role, resultGenerator: (both: boolean) => Promise<void>, expectedRenderCount: number = 5) {
         const container = role === vsls.Role.Host? hostContainer : guestContainer;
 
-        // If just the host session has started or nobody, just do a normal add code. 
+        // If just the host session has started or nobody, just run the host.
         const guestStarted = isSessionStarted(vsls.Role.Guest);
         if (!guestStarted) {
-            await addCode(() => getOrCreateHistory(role), container.wrapper, code, expectedRenderCount);
+            const hostRenderPromise = waitForUpdate(hostContainer.wrapper, MainPanel, expectedRenderCount);
+
+            // Generate our results
+            await resultGenerator(false);
+
+            // Wait for all of the renders to go through
+            await hostRenderPromise;
         } else {
             // Otherwise more complicated. We have to wait for renders on both
 
@@ -200,15 +209,28 @@ suite('LiveShare tests', () => {
             const hostRenderPromise = waitForUpdate(hostContainer.wrapper, MainPanel, expectedRenderCount);
             const guestRenderPromise = waitForUpdate(guestContainer.wrapper, MainPanel, expectedRenderCount);
 
-            // Add code to the apropriate container
-            const host = await getOrCreateHistory(vsls.Role.Host);
-            const guest = await getOrCreateHistory(vsls.Role.Guest);
-            await (role === vsls.Role.Host ? host.addCode(code, 'foo.py', 2) : guest.addCode(code, 'foo.py', 2));
+            // Generate our results
+            await resultGenerator(true);
 
             // Wait for all of the renders to go through
             await Promise.all([hostRenderPromise, guestRenderPromise]);
         }
         return container.wrapper;
+
+    }
+
+    async function addCodeToRole(role: vsls.Role, code: string, expectedRenderCount: number = 5) : Promise<ReactWrapper<any, Readonly<{}>, React.Component>> {
+        return waitForResults(role, async (both: boolean) => {
+            if (!both) {
+                const history = await getOrCreateHistory(role);
+                return history.addCode(code, 'foo.py', 2);
+            } else {
+                // Add code to the apropriate container
+                const host = await getOrCreateHistory(vsls.Role.Host);
+                const guest = await getOrCreateHistory(vsls.Role.Guest);
+                return (role === vsls.Role.Host ? host.addCode(code, 'foo.py', 2) : guest.addCode(code, 'foo.py', 2));
+            }
+        }, expectedRenderCount);
     }
 
     function startSession(role: vsls.Role) : Promise<void> {
@@ -278,6 +300,57 @@ suite('LiveShare tests', () => {
 
         assert.ok(hostContainer.wrapper, 'Host wrapper not created');
         verifyHtmlOnCell(hostContainer.wrapper, '<span>1</span>', CellPosition.Last);
+    });
+
+    test('Going through codewatcher', async () => {
+        // Should only need mock data in host
+        addMockData(hostContainer.ioc, 'a=1\na', 1);
+
+        // Start both the host and the guest
+        await startSession(vsls.Role.Host);
+        await startSession(vsls.Role.Guest);
+
+        // Setup a document and text
+        const fileName = 'test.py';
+        const version = 1;
+        const inputText =
+`#%%
+a=1
+a`;
+        const document = createDocument(inputText, fileName, version, TypeMoq.Times.atLeastOnce());
+        document.setup(doc => doc.getText(TypeMoq.It.isAny())).returns(() => inputText);
+
+        const codeWatcher = guestContainer.ioc.get<ICodeWatcher>(ICodeWatcher);
+        codeWatcher.setDocument(document.object);
+
+        // Send code using a codewatcher instead (we're sending it through the guest)
+        const wrapper = await waitForResults(vsls.Role.Guest, async (both: boolean) => {
+            // Should always be both
+            assert.ok(both, 'Expected both guest and host to be used');
+            await codeWatcher.runAllCells();
+        });
+        verifyHtmlOnCell(wrapper, '<span>1</span>', CellPosition.Last);
+    });
+
+    test('Export from guest', async () => {
+        // Should only need mock data in host
+        addMockData(hostContainer.ioc, 'a=1\na', 1);
+
+        // Start both the host and the guest
+        await startSession(vsls.Role.Host);
+        await startSession(vsls.Role.Guest);
+
+        // Send code through the host
+        const wrapper = await addCodeToRole(vsls.Role.Host, 'a=1\na');
+        verifyHtmlOnCell(wrapper, '<span>1</span>', CellPosition.Last);
+
+        // Attempt to export it from the guest by running an ExportFileAndOutputAsNotebook
+        const guestCommandManager = guestContainer.ioc.get<ICommandManager>(ICommandManager);
+        const executePromise = guestCommandManager.executeCommand(Commands.ExportFileAndOutputAsNotebook, Uri.file('foo.py')) as Promise<Uri>;
+        assert.ok(executePromise, 'Export file did not return a promise');
+        const savedUri = await executePromise;
+        assert.ok(savedUri, 'Uri not returned from export');
+        assert.equal(savedUri.fsPath, 'bar.ipynb', 'Export did not work');
     });
 
 });

@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 'use strict';
 import { inject, injectable } from 'inversify';
-import { CancellationToken } from 'vscode';
+import { CancellationToken, Event, EventEmitter } from 'vscode';
 
 import { ILiveShareApi, IWorkspaceService } from '../../common/application/types';
 import { IFileSystem } from '../../common/platform/types';
@@ -52,6 +52,7 @@ type JupyterExecutionClassType = {
 export class JupyterExecutionFactory implements IJupyterExecution, IAsyncDisposable {
 
     private executionFactory: RoleBasedFactory<IJupyterExecutionInterface, JupyterExecutionClassType>;
+    private sessionChangedEventEmitter: EventEmitter<void> = new EventEmitter<void>();
 
     constructor(@inject(ILiveShareApi) liveShare: ILiveShareApi,
                 @inject(IPythonExecutionFactory) pythonFactory: IPythonExecutionFactory,
@@ -87,6 +88,11 @@ export class JupyterExecutionFactory implements IJupyterExecution, IAsyncDisposa
             commandFactory,
             serviceContainer
         );
+        this.executionFactory.sessionChanged(() => this.onSessionChanged());
+    }
+
+    public get sessionChanged() : Event<void> {
+        return this.sessionChangedEventEmitter.event;
     }
 
     public async dispose() : Promise<void> {
@@ -134,5 +140,9 @@ export class JupyterExecutionFactory implements IJupyterExecution, IAsyncDisposa
     public async getServer(options?: INotebookServerOptions) : Promise<INotebookServer | undefined> {
         const execution = await this.executionFactory.get();
         return execution.getServer(options);
+    }
+
+    private onSessionChanged() {
+        this.sessionChangedEventEmitter.fire();
     }
 }

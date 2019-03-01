@@ -75,6 +75,7 @@ export interface INotebookServerOptions {
 
 export const IJupyterExecution = Symbol('IJupyterExecution');
 export interface IJupyterExecution extends IAsyncDisposable {
+    sessionChanged: Event<void> ;
     isNotebookSupported(cancelToken?: CancellationToken) : Promise<boolean>;
     isImportSupported(cancelToken?: CancellationToken) : Promise<boolean>;
     isKernelCreateSupported(cancelToken?: CancellationToken): Promise<boolean>;
@@ -127,6 +128,7 @@ export interface IHistoryProvider {
 export const IHistory = Symbol('IHistory');
 export interface IHistory extends Disposable {
     closed: Event<IHistory>;
+    ready: Promise<void>;
     show() : Promise<void>;
     addCode(code: string, file: string, line: number, editor?: TextEditor) : Promise<void>;
     // tslint:disable-next-line:no-any
@@ -164,11 +166,11 @@ export interface ICodeWatcher {
     getVersion() : number;
     getCodeLenses() : CodeLens[];
     getCachedSettings() : IDataScienceSettings | undefined;
-    runAllCells(): void;
-    runCell(range: Range): void;
-    runCurrentCell(): void;
-    runCurrentCellAndAdvance(): void;
-    runSelectionOrLine(activeEditor: TextEditor | undefined): void;
+    runAllCells(): Promise<void>;
+    runCell(range: Range): Promise<void>;
+    runCurrentCell(): Promise<void>;
+    runCurrentCellAndAdvance(): Promise<void>;
+    runSelectionOrLine(activeEditor: TextEditor | undefined): Promise<void>;
 }
 
 export enum CellState {

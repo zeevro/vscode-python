@@ -170,7 +170,7 @@ export class HistoryCommandListener implements IDataScienceCommandListener {
     }
 
     @captureTelemetry(Telemetry.ExportPythonFileAndOutput, undefined, false)
-    private async exportFileAndOutput(file: string): Promise<void> {
+    private async exportFileAndOutput(file: string): Promise<Uri | undefined> {
         if (file && file.length > 0 && this.jupyterExecution.isNotebookSupported()) {
             // If the current file is the active editor, then generate cells from the document.
             const activeEditor = this.documentManager.activeTextEditor;
@@ -208,8 +208,9 @@ export class HistoryCommandListener implements IDataScienceCommandListener {
                                 this.jupyterExecution.spawnNotebook(output).ignoreErrors();
                             }
                         });
-
                     }
+
+                    return Uri.file(output);
                 }
             }
         } else {

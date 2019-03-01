@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 'use strict';
 import * as vsls from 'vsls/vscode';
+import * as vscode from 'vscode';
 
 import { ILiveShareApi } from '../../../common/application/types';
 import { IAsyncDisposable } from '../../../common/types';
@@ -17,9 +18,15 @@ export class RoleBasedFactory<T extends IRoleBasedObject, CtorType extends Class
     private ctorArgs : any[];
     private firstTime : boolean = true;
     private createPromise : Promise<T> | undefined;
+    private sessionChangedEmitter = new vscode.EventEmitter<void>();
 
     constructor(private liveShare: ILiveShareApi, private hostCtor: CtorType, private guestCtor: CtorType, ...args: any[]) {
         this.ctorArgs = args;
+        this.createPromise = this.createBasedOnRole(); // We need to start creation immediately or one side may call before we init.
+    }
+
+    public get sessionChanged() : vscode.Event<void> {
+        return this.sessionChangedEmitter.event;
     }
 
     public get() : Promise<T> {
@@ -77,6 +84,9 @@ export class RoleBasedFactory<T extends IRoleBasedObject, CtorType extends Class
                 if (!objDisposed) {
                     obj.onSessionChange(api).ignoreErrors();
                 }
+
+                // Fire our event indicating old data is no longer valid.
+                this.sessionChangedEmitter.fire();
             });
             api.onDidChangePeers((e) => {
                 if (!objDisposed) {

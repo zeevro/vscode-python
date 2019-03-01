@@ -7,7 +7,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { URL } from 'url';
 import * as uuid from 'uuid/v4';
-import { CancellationToken } from 'vscode-jsonrpc';
+import { CancellationToken, Event, EventEmitter } from 'vscode';
 
 import { ILiveShareApi, IWorkspaceService } from '../../common/application/types';
 import { Cancellation, CancellationError } from '../../common/cancellation';
@@ -41,6 +41,7 @@ export class JupyterExecutionBase implements IJupyterExecution {
     private commands: Record<string, IJupyterCommand> = {};
     private jupyterPath: string | undefined;
     private usablePythonInterpreter: PythonInterpreter | undefined;
+    private eventEmitter: EventEmitter<void> = new EventEmitter<void>();
 
     constructor(liveShare: ILiveShareApi,
                 private executionFactory: IPythonExecutionFactory,
@@ -69,6 +70,10 @@ export class JupyterExecutionBase implements IJupyterExecution {
             });
             this.disposableRegistry.push(disposable);
         }
+    }
+
+    public get sessionChanged() : Event<void> {
+        return this.eventEmitter.event;
     }
 
     public dispose() : Promise<void> {

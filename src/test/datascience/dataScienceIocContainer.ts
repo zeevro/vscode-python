@@ -92,7 +92,8 @@ import {
     INotebookImporter,
     INotebookServer,
     IStatusProvider,
-    IThemeFinder
+    IThemeFinder,
+    ICodeWatcher
 } from '../../client/datascience/types';
 import { EnvironmentActivationService } from '../../client/interpreter/activation/service';
 import { IEnvironmentActivationService } from '../../client/interpreter/activation/types';
@@ -167,6 +168,7 @@ import { MockExtensions } from './mockExtensions';
 import { MockJupyterManager } from './mockJupyterManager';
 import { MockLiveShareApi } from './mockLiveShare';
 import { interfaces } from 'inversify';
+import { CodeWatcher } from '../../client/datascience/editor-integration/codewatcher';
 
 export class DataScienceIocContainer extends UnitTestIocContainer {
 
@@ -218,6 +220,7 @@ export class DataScienceIocContainer extends UnitTestIocContainer {
         this.serviceManager.addSingletonInstance<IAsyncDisposableRegistry>(IAsyncDisposableRegistry, this.asyncRegistry);
         this.serviceManager.addSingleton<IPythonInPathCommandProvider>(IPythonInPathCommandProvider, PythonInPathCommandProvider);
         this.serviceManager.addSingleton<IEnvironmentActivationService>(IEnvironmentActivationService, EnvironmentActivationService);
+        this.serviceManager.add<ICodeWatcher>(ICodeWatcher, CodeWatcher);
 
         this.serviceManager.addSingleton<ITerminalHelper>(ITerminalHelper, TerminalHelper);
         this.serviceManager.addSingleton<ITerminalActivationCommandProvider>(
