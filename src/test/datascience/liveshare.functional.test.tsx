@@ -3,57 +3,36 @@
 'use strict';
 import * as assert from 'assert';
 import { mount, ReactWrapper } from 'enzyme';
-import * as vsls from 'vsls/vscode';
-import * as fs from 'fs-extra';
-import { min } from 'lodash';
 import * as path from 'path';
 import * as React from 'react';
 import { SemVer } from 'semver';
 import * as TypeMoq from 'typemoq';
-import { CancellationToken, Disposable, TextDocument, TextEditor } from 'vscode';
+import { Disposable } from 'vscode';
+import * as vsls from 'vsls/vscode';
 
 import {
-    IApplicationShell,
-    IDocumentManager,
+    ILiveShareApi,
+    ILiveShareTestingApi,
     IWebPanel,
     IWebPanelMessageListener,
     IWebPanelProvider,
-    WebPanelMessage,
-    ILiveShareApi,
-    ILiveShareTestingApi
+    WebPanelMessage
 } from '../../client/common/application/types';
-import { EXTENSION_ROOT_DIR } from '../../client/common/constants';
-import { IDataScienceSettings } from '../../client/common/types';
 import { createDeferred, Deferred } from '../../client/common/utils/async';
-import { noop } from '../../client/common/utils/misc';
 import { Architecture } from '../../client/common/utils/platform';
-import { EditorContexts } from '../../client/datascience/constants';
 import { HistoryMessageListener } from '../../client/datascience/historyMessageListener';
 import { HistoryMessages } from '../../client/datascience/historyTypes';
-import { IHistory, IHistoryProvider, IJupyterExecution } from '../../client/datascience/types';
+import { IHistory, IHistoryProvider } from '../../client/datascience/types';
 import { InterpreterType, PythonInterpreter } from '../../client/interpreter/contracts';
-import { CellButton } from '../../datascience-ui/history-react/cellButton';
 import { MainPanel } from '../../datascience-ui/history-react/MainPanel';
 import { IVsCodeApi } from '../../datascience-ui/react-common/postOffice';
-import { updateSettings } from '../../datascience-ui/react-common/settingsReactSide';
-import { sleep } from '../core';
 import { DataScienceIocContainer } from './dataScienceIocContainer';
+import { addCode, addMockData, verifyHtmlOnCell, CellPosition } from './historyTestHelpers';
 import { SupportedCommands } from './mockJupyterManager';
-import { blurWindow, createInputEvent, createKeyboardEvent, waitForUpdate, createMessageEvent } from './reactHelpers';
-import { addCode, verifyHtmlOnCell, addMockData } from './historyTestHelpers';
+import { blurWindow, createMessageEvent, waitForUpdate } from './reactHelpers';
+import { Container } from 'inversify';
 
 //tslint:disable:trailing-comma no-any no-multiline-string
-enum CellInputState {
-    Hidden,
-    Visible,
-    Collapsed,
-    Expanded
-}
-
-enum CellPosition {
-    First = 'first',
-    Last = 'last'
-}
 
 class ContainerData {
     public ioc: DataScienceIocContainer | undefined;
@@ -141,6 +120,9 @@ suite('LiveShare tests', () => {
 
         // We need to mount the react control before we even create a history object. Otherwise the mount will miss rendering some parts
         mountReactControl(result);
+
+        // Make sure the history provider in the container is created (the extension does this on startup in the extension)
+        result.ioc.get<IHistoryProvider>(IHistoryProvider);
 
         return result;
     }
@@ -272,6 +254,30 @@ suite('LiveShare tests', () => {
         // Verify it ended up on the guest too
         assert.ok(guestContainer.wrapper, 'Guest wrapper not created');
         verifyHtmlOnCell(guestContainer.wrapper, '<span>1</span>', CellPosition.Last);
+    });
+
+    test('Host startup and guest restart', async () => {
+        // Should only need mock data in host
+        addMockData(hostContainer.ioc, 'a=1\na', 1);
+
+        // Start the host, and add some data
+        const host = await getOrCreateHistory(vsls.Role.Host);
+        await startSession(vsls.Role.Host);
+
+        // Send code through the host
+        let wrapper = await addCodeToRole(vsls.Role.Host, 'a=1\na');
+        verifyHtmlOnCell(wrapper, '<span>1</span>', CellPosition.Last);
+
+        // Shutdown the host
+        await host.dispose();
+
+        // Startup a guest and run some code. 
+        await startSession(vsls.Role.Guest);
+        wrapper = await addCodeToRole(vsls.Role.Guest, 'a=1\na');
+        verifyHtmlOnCell(wrapper, '<span>1</span>', CellPosition.Last);
+
+        assert.ok(hostContainer.wrapper, 'Host wrapper not created');
+        verifyHtmlOnCell(hostContainer.wrapper, '<span>1</span>', CellPosition.Last);
     });
 
 });

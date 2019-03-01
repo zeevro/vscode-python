@@ -264,7 +264,7 @@ class MockLiveShare implements vsls.LiveShare, vsls.Session, vsls.Peer {
             throw new Error(`Not a workspace file URI: ${localUri}`);
         }
 
-        const file = path.basename(localUri.fsPath);
+        const file = localUri.fsPath.includes('/') ? path.basename(localUri.fsPath) : localUri.fsPath;
         return Uri.parse(`vsls:${file}`);
     }
     public convertSharedUriToLocal(sharedUri: Uri): Uri {
@@ -280,8 +280,7 @@ class MockLiveShare implements vsls.LiveShare, vsls.Session, vsls.Peer {
                 `Not a shared URI: ${sharedUri}`);
         }
 
-        // Extract the path and combine with root
-        return Uri.file(path.join(EXTENSION_ROOT_DIR, sharedUri.fragment));
+        return Uri.file(sharedUri.fsPath);
     }
     public registerCommand(command: string, isEnabled?: () => boolean, thisArg?: any): Disposable {
         throw new Error('Method not implemented.');
