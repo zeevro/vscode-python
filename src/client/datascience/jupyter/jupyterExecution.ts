@@ -188,7 +188,7 @@ export class JupyterExecutionBase implements IJupyterExecution {
         notebookCommand.exec(args, { throwOnStdErr: false, encoding: 'utf8' }).ignoreErrors();
     }
 
-    public async importNotebook(file: string, template: string): Promise<string> {
+    public async importNotebook(file: string, template: string | undefined): Promise<string> {
         // First we find a way to start a nbconvert
         const convert = await this.findBestCommand(JupyterCommands.ConvertCommand);
         if (!convert) {
@@ -196,7 +196,8 @@ export class JupyterExecutionBase implements IJupyterExecution {
         }
 
         // Wait for the nbconvert to finish
-        const result = await convert.exec([file, '--to', 'python', '--stdout', '--template', template], { throwOnStdErr: false, encoding: 'utf8' });
+        const args = template ? [file, '--to', 'python', '--stdout', '--template', template] : [file, '--to', 'python', '--stdout'];
+        const result = await convert.exec(args, { throwOnStdErr: false, encoding: 'utf8' });
         if (result.stderr) {
             // Stderr on nbconvert doesn't indicate failure. Just log the result
             this.logger.logInformation(result.stderr);

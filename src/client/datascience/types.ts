@@ -83,7 +83,7 @@ export interface IJupyterExecution extends IAsyncDisposable {
     isSpawnSupported(cancelToken?: CancellationToken): Promise<boolean>;
     connectToNotebookServer(options?: INotebookServerOptions, cancelToken?: CancellationToken) : Promise<INotebookServer | undefined>;
     spawnNotebook(file: string) : Promise<void>;
-    importNotebook(file: string, template: string) : Promise<string>;
+    importNotebook(file: string, template: string | undefined) : Promise<string>;
     getUsableJupyterPython(cancelToken?: CancellationToken) : Promise<PythonInterpreter | undefined>;
     getServer(options?: INotebookServerOptions) : Promise<INotebookServer | undefined>;
 }

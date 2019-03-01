@@ -93,7 +93,8 @@ import {
     INotebookServer,
     IStatusProvider,
     IThemeFinder,
-    ICodeWatcher
+    ICodeWatcher,
+    IDataScienceCommandListener
 } from '../../client/datascience/types';
 import { EnvironmentActivationService } from '../../client/interpreter/activation/service';
 import { IEnvironmentActivationService } from '../../client/interpreter/activation/types';
@@ -169,6 +170,8 @@ import { MockJupyterManager } from './mockJupyterManager';
 import { MockLiveShareApi } from './mockLiveShare';
 import { interfaces } from 'inversify';
 import { CodeWatcher } from '../../client/datascience/editor-integration/codewatcher';
+import { HistoryCommandListener } from '../../client/datascience/historycommandlistener';
+import { MockDocumentManager } from './mockDocumentManager';
 
 export class DataScienceIocContainer extends UnitTestIocContainer {
 
@@ -184,6 +187,7 @@ export class DataScienceIocContainer extends UnitTestIocContainer {
     private shouldMockJupyter: boolean;
     private asyncRegistry: AsyncDisposableRegistry;
     private configChangeEvent = new EventEmitter<ConfigurationChangeEvent>();
+    private documentManager = new MockDocumentManager();
 
     constructor() {
         super();
@@ -221,6 +225,7 @@ export class DataScienceIocContainer extends UnitTestIocContainer {
         this.serviceManager.addSingleton<IPythonInPathCommandProvider>(IPythonInPathCommandProvider, PythonInPathCommandProvider);
         this.serviceManager.addSingleton<IEnvironmentActivationService>(IEnvironmentActivationService, EnvironmentActivationService);
         this.serviceManager.add<ICodeWatcher>(ICodeWatcher, CodeWatcher);
+        this.serviceManager.add<IDataScienceCommandListener>(IDataScienceCommandListener, HistoryCommandListener);
 
         this.serviceManager.addSingleton<ITerminalHelper>(ITerminalHelper, TerminalHelper);
         this.serviceManager.addSingleton<ITerminalActivationCommandProvider>(
@@ -247,7 +252,6 @@ export class DataScienceIocContainer extends UnitTestIocContainer {
         const logger = TypeMoq.Mock.ofType<ILogger>();
         const condaService = TypeMoq.Mock.ofType<ICondaService>();
         const appShell = TypeMoq.Mock.ofType<IApplicationShell>();
-        const documentManager = TypeMoq.Mock.ofType<IDocumentManager>();
         const workspaceService = TypeMoq.Mock.ofType<IWorkspaceService>();
         const configurationService = TypeMoq.Mock.ofType<IConfigurationService>();
         const interpreterDisplay = TypeMoq.Mock.ofType<IInterpreterDisplay>();
@@ -351,7 +355,7 @@ export class DataScienceIocContainer extends UnitTestIocContainer {
         this.serviceManager.addSingletonInstance<ILogger>(ILogger, logger.object);
         this.serviceManager.addSingletonInstance<ICondaService>(ICondaService, condaService.object);
         this.serviceManager.addSingletonInstance<IApplicationShell>(IApplicationShell, appShell.object);
-        this.serviceManager.addSingletonInstance<IDocumentManager>(IDocumentManager, documentManager.object);
+        this.serviceManager.addSingletonInstance<IDocumentManager>(IDocumentManager, this.documentManager);
         this.serviceManager.addSingletonInstance<IWorkspaceService>(IWorkspaceService, workspaceService.object);
         this.serviceManager.addSingletonInstance<IConfigurationService>(IConfigurationService, configurationService.object);
         this.serviceManager.addSingletonInstance<IDataScience>(IDataScience, datascience.object);
@@ -409,7 +413,7 @@ export class DataScienceIocContainer extends UnitTestIocContainer {
 
         appShell.setup(a => a.showErrorMessage(TypeMoq.It.isAnyString())).returns((e) => { throw e; });
         appShell.setup(a => a.showInformationMessage(TypeMoq.It.isAny(), TypeMoq.It.isAny())).returns(() => Promise.resolve(''));
-        appShell.setup(a => a.showSaveDialog(TypeMoq.It.isAny())).returns(() => Promise.resolve(Uri.file('')));
+        appShell.setup(a => a.showSaveDialog(TypeMoq.It.isAny())).returns(() => Promise.resolve(Uri.file('test.ipynb')));
         appShell.setup(a => a.setStatusBarMessage(TypeMoq.It.isAny())).returns(() => dummyDisposable);
 
         // tslint:disable-next-line:no-empty no-console
@@ -453,6 +457,10 @@ export class DataScienceIocContainer extends UnitTestIocContainer {
 
     public get<T>(serviceIdentifier: interfaces.ServiceIdentifier<T>) : T {
         return this.serviceManager.get<T>(serviceIdentifier);
+    }
+
+    public addDocument(code: string, file: string) {
+        this.documentManager.addDocument(code, file);
     }
 
     private findPythonPath(): string {

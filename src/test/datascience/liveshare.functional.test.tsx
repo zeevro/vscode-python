@@ -17,13 +17,14 @@ import {
     IWebPanel,
     IWebPanelMessageListener,
     IWebPanelProvider,
-    WebPanelMessage
+    WebPanelMessage,
+    IDocumentManager
 } from '../../client/common/application/types';
 import { createDeferred, Deferred } from '../../client/common/utils/async';
 import { Architecture } from '../../client/common/utils/platform';
 import { HistoryMessageListener } from '../../client/datascience/historyMessageListener';
 import { HistoryMessages } from '../../client/datascience/historyTypes';
-import { ICodeWatcher, IHistory, IHistoryProvider, IJupyterExecution } from '../../client/datascience/types';
+import { ICodeWatcher, IHistory, IHistoryProvider, IJupyterExecution, IDataScienceCommandListener } from '../../client/datascience/types';
 import { InterpreterType, PythonInterpreter } from '../../client/interpreter/contracts';
 import { MainPanel } from '../../datascience-ui/history-react/MainPanel';
 import { IVsCodeApi } from '../../datascience-ui/react-common/postOffice';
@@ -33,6 +34,8 @@ import { addMockData, CellPosition, verifyHtmlOnCell } from './historyTestHelper
 import { SupportedCommands } from './mockJupyterManager';
 import { blurWindow, createMessageEvent, waitForUpdate } from './reactHelpers';
 import { Commands } from '../../client/datascience/constants';
+import { IFileSystem, TemporaryFile } from '../../client/common/platform/types';
+import { noop } from '../../client/common/utils/misc';
 
 //tslint:disable:trailing-comma no-any no-multiline-string
 
@@ -124,8 +127,22 @@ suite('LiveShare tests', () => {
         mountReactControl(result);
 
         // Make sure the history provider and execution factory in the container is created (the extension does this on startup in the extension)
-        result.ioc.get<IHistoryProvider>(IHistoryProvider);
+        const historyProvider = result.ioc.get<IHistoryProvider>(IHistoryProvider);
         result.ioc.get<IJupyterExecution>(IJupyterExecution);
+
+        // The history provider create needs to be rewritten to make the history window think the mounted web panel is 
+        // ready.
+        const origFunc = (historyProvider as any).create.bind(historyProvider);
+        (historyProvider as any).create = async () :Promise<IHistory> => {
+            const result = await origFunc();
+
+            // During testing the MainPanel sends the init message before our history is created.
+            // Pretend like it's happening now
+            const listener = ((result as any)['messageListener']) as HistoryMessageListener;
+            listener.onMessage(HistoryMessages.Started, {});
+
+            return result;
+        };
 
         return result;
     }
@@ -170,17 +187,10 @@ suite('LiveShare tests', () => {
         window.addEventListener = oldListener;
     }
 
-    async function getOrCreateHistory(role: vsls.Role) : Promise<IHistory> {
+    function getOrCreateHistory(role: vsls.Role) : Promise<IHistory> {
         // Get the container to use based on the role. 
         const container = role === vsls.Role.Host ? hostContainer : guestContainer;
-        const history = await container.ioc!.get<IHistoryProvider>(IHistoryProvider).getOrCreateActive();
-
-        // During testing the MainPanel sends the init message before our history is created.
-        // Pretend like it's happening now
-        const listener = ((history as any)['messageListener']) as HistoryMessageListener;
-        listener.onMessage(HistoryMessages.Started, {});
-
-        return history;
+        return container.ioc!.get<IHistoryProvider>(IHistoryProvider).getOrCreateActive();
     }
 
     function isSessionStarted(role: vsls.Role) : boolean {
@@ -313,10 +323,7 @@ suite('LiveShare tests', () => {
         // Setup a document and text
         const fileName = 'test.py';
         const version = 1;
-        const inputText =
-`#%%
-a=1
-a`;
+        const inputText = '#%%\na=1\na';
         const document = createDocument(inputText, fileName, version, TypeMoq.Times.atLeastOnce());
         document.setup(doc => doc.getText(TypeMoq.It.isAny())).returns(() => inputText);
 
@@ -336,21 +343,39 @@ a`;
         // Should only need mock data in host
         addMockData(hostContainer.ioc, 'a=1\na', 1);
 
+        // Remap the fileSystem so we control the write for the notebook. Have to do this
+        // before the listener is created so that it uses this file system.
+        let outputContents : string | undefined;
+        const fileSystem = TypeMoq.Mock.ofType<IFileSystem>();
+        guestContainer.ioc.serviceManager.rebindInstance<IFileSystem>(IFileSystem, fileSystem.object);
+        fileSystem.setup(f => f.writeFile(TypeMoq.It.isAny(), TypeMoq.It.isAny())).returns((f, c) => {
+            outputContents = c.toString();
+            return Promise.resolve();
+        });
+        fileSystem.setup(f => f.arePathsSame(TypeMoq.It.isAny(), TypeMoq.It.isAny()))
+            .returns(() => true);
+
+        // Need to register commands as our extension isn't actually loading.
+        const listener = guestContainer.ioc.get<IDataScienceCommandListener>(IDataScienceCommandListener);
+        const guestCommandManager = guestContainer.ioc.get<ICommandManager>(ICommandManager);
+        listener.register(guestCommandManager);
+
         // Start both the host and the guest
         await startSession(vsls.Role.Host);
         await startSession(vsls.Role.Guest);
 
-        // Send code through the host
-        const wrapper = await addCodeToRole(vsls.Role.Host, 'a=1\na');
-        verifyHtmlOnCell(wrapper, '<span>1</span>', CellPosition.Last);
+        // Create a document on the guest
+        guestContainer.ioc.addDocument('#%%\na=1\na', 'foo.py');
+        guestContainer.ioc.get<IDocumentManager>(IDocumentManager).showTextDocument(Uri.file('foo.py'));
 
-        // Attempt to export it from the guest by running an ExportFileAndOutputAsNotebook
-        const guestCommandManager = guestContainer.ioc.get<ICommandManager>(ICommandManager);
+        // Attempt to export a file from the guest by running an ExportFileAndOutputAsNotebook
         const executePromise = guestCommandManager.executeCommand(Commands.ExportFileAndOutputAsNotebook, Uri.file('foo.py')) as Promise<Uri>;
         assert.ok(executePromise, 'Export file did not return a promise');
         const savedUri = await executePromise;
         assert.ok(savedUri, 'Uri not returned from export');
-        assert.equal(savedUri.fsPath, 'bar.ipynb', 'Export did not work');
+        assert.equal(savedUri.fsPath, 'test.ipynb', 'Export did not work');
+        assert.ok(outputContents, 'Output not exported');
+        assert.ok(outputContents.includes('data'), 'Output is empty');
     });
 
 });

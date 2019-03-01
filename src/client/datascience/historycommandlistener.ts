@@ -51,37 +51,37 @@ export class HistoryCommandListener implements IDataScienceCommandListener {
     public register(commandManager: ICommandManager): void {
         let disposable = commandManager.registerCommand(Commands.ShowHistoryPane, () => this.showHistoryPane());
         this.disposableRegistry.push(disposable);
-        disposable = commandManager.registerCommand(Commands.ImportNotebook, async (file: Uri, cmdSource: CommandSource = CommandSource.commandPalette) => {
-            await this.listenForErrors(async () => {
+        disposable = commandManager.registerCommand(Commands.ImportNotebook, (file: Uri, cmdSource: CommandSource = CommandSource.commandPalette) => {
+            return this.listenForErrors(() => {
                 if (file && file.fsPath) {
-                    await this.importNotebookOnFile(file.fsPath);
+                    return this.importNotebookOnFile(file.fsPath);
                 } else {
-                    await this.importNotebook();
+                    return this.importNotebook();
                 }
             });
         });
         this.disposableRegistry.push(disposable);
-        disposable = commandManager.registerCommand(Commands.ExportFileAsNotebook, async (file: Uri, cmdSource: CommandSource = CommandSource.commandPalette) => {
-            await this.listenForErrors(async () => {
+        disposable = commandManager.registerCommand(Commands.ExportFileAsNotebook, (file: Uri, cmdSource: CommandSource = CommandSource.commandPalette) => {
+            return this.listenForErrors(() => {
                 if (file && file.fsPath) {
-                    await this.exportFile(file.fsPath);
+                    return this.exportFile(file.fsPath);
                 } else {
                     const activeEditor = this.documentManager.activeTextEditor;
                     if (activeEditor && activeEditor.document.languageId === PYTHON_LANGUAGE) {
-                        await this.exportFile(activeEditor.document.fileName);
+                        return this.exportFile(activeEditor.document.fileName);
                     }
                 }
             });
         });
         this.disposableRegistry.push(disposable);
-        disposable = commandManager.registerCommand(Commands.ExportFileAndOutputAsNotebook, async (file: Uri, cmdSource: CommandSource = CommandSource.commandPalette) => {
-            await this.listenForErrors(async () => {
+        disposable = commandManager.registerCommand(Commands.ExportFileAndOutputAsNotebook, (file: Uri, cmdSource: CommandSource = CommandSource.commandPalette) => {
+            return this.listenForErrors(() => {
                 if (file && file.fsPath) {
-                    await this.exportFileAndOutput(file.fsPath);
+                    return this.exportFileAndOutput(file.fsPath);
                 } else {
                     const activeEditor = this.documentManager.activeTextEditor;
                     if (activeEditor && activeEditor.document.languageId === PYTHON_LANGUAGE) {
-                        await this.exportFileAndOutput(activeEditor.document.fileName);
+                        return this.exportFileAndOutput(activeEditor.document.fileName);
                     }
                 }
             });
@@ -97,9 +97,10 @@ export class HistoryCommandListener implements IDataScienceCommandListener {
         this.disposableRegistry.push(commandManager.registerCommand(Commands.ExportOutputAsNotebook, () => this.exportCells()));
     }
 
-    private async listenForErrors(promise: () => Promise<void>) : Promise<void> {
+    private async listenForErrors(promise: () => Promise<any>) : Promise<any> {
         try {
-            await promise();
+            const result = await promise();
+            return result;
         } catch (err) {
             if (!(err instanceof CancellationError)) {
                 if (err.message) {
@@ -174,7 +175,7 @@ export class HistoryCommandListener implements IDataScienceCommandListener {
         if (file && file.length > 0 && this.jupyterExecution.isNotebookSupported()) {
             // If the current file is the active editor, then generate cells from the document.
             const activeEditor = this.documentManager.activeTextEditor;
-            if (activeEditor && this.fileSystem.arePathsSame(activeEditor.document.fileName, file)) {
+            if (activeEditor && activeEditor.document && this.fileSystem.arePathsSame(activeEditor.document.fileName, file)) {
                 const ranges = generateCellRanges(activeEditor.document);
                 if (ranges.length > 0) {
                     // Ask user for path
