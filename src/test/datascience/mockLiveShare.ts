@@ -10,6 +10,7 @@ import { Event, Uri, Disposable, TreeDataProvider, EventEmitter, CancellationTok
 import { ILiveShareTestingApi } from '../../client/common/application/types';
 import { EXTENSION_ROOT_DIR } from '../../client/constants';
 import { noop } from '../../client/common/utils/misc';
+import { IDisposable } from '../../client/common/types';
 
 // tslint:disable:no-any unified-signatures
 
@@ -69,19 +70,103 @@ function checkArg(value: any, name: string, type?: ArgumentType) {
     }
 }
 
+type Listener = [Function, any] | Function;
+
+class Emitter<T> {
+
+	private static readonly _noop = function () { };
+
+	private _event: Event<T>;
+	private _disposed: boolean;
+	private _deliveryQueue: [Listener, T][];
+	protected _listeners: Listener[] = [];
+
+	get event(): Event<T> {
+		if (!this._event) {
+			this._event = (listener: (e: T) => any, thisArgs?: any, disposables?: IDisposable[]) => {
+				this._listeners.push(!thisArgs ? listener : [listener, thisArgs]);
+				let result: IDisposable;
+				result = {
+					dispose: () => {
+						result.dispose = Emitter._noop;
+						if (!this._disposed) {
+							this._listeners = this._listeners.filter(l => l != listener);
+						}
+					}
+				};
+				if (Array.isArray(disposables)) {
+					disposables.push(result);
+				}
+
+				return result;
+			};
+		}
+		return this._event;
+	}
+
+	/**
+	 * To be kept private to fire an event to
+	 * subscribers
+	 */
+	public async fire(event?: T): Promise<void> {
+		if (this._listeners) {
+			// put all [listener,event]-pairs into delivery queue
+			// then emit all event. an inner/nested event might be
+			// the driver of this
+
+			if (!this._deliveryQueue) {
+				this._deliveryQueue = [];
+			}
+
+			for (const l of this._listeners) {
+				this._deliveryQueue.push([l, event]);
+			}
+
+			while (this._deliveryQueue.length > 0) {
+                const [listener, event] = this._deliveryQueue.shift();
+                let result : any;
+				try {
+					if (typeof listener === 'function') {
+						result = listener.call(undefined, event);
+					} else {
+						result = listener[0].call(listener[1], event);
+					}
+				} catch (e) {
+					// Do nothing 
+                }
+                if (result) {
+                    const promise = result as Promise<void>;
+                    if (promise) {
+                        await promise;
+                    }
+                }
+			}
+		}
+    }
+
+	public dispose() {
+		if (this._listeners) {
+			this._listeners = undefined;
+		}
+		if (this._deliveryQueue) {
+			this._deliveryQueue.length = 0;
+		}
+		this._disposed = true;
+	}
+}
 
 class MockLiveShare implements vsls.LiveShare, vsls.Session, vsls.Peer {
     private static others : MockLiveShare [] = [];
     private static services : Map<string, MockLiveService> = new Map<string, MockLiveService>();
-    private changeSessionEmitter = new EventEmitter<vsls.SessionChangeEvent>();
+    private changeSessionEmitter = new Emitter<vsls.SessionChangeEvent>();
     private changePeersEmitter = new EventEmitter<vsls.PeersChangeEvent>();
     private currentPeers : vsls.Peer[] = [];
     private _id = uuid();
     private _peerNumber = 0;
+    private _visibleRole = vsls.Role.None;
     constructor(private _role: vsls.Role) {
         this._peerNumber = _role === vsls.Role.Host ? 0 : 1;
         MockLiveShare.others.push(this);
-        MockLiveShare.others.forEach(f => f.onPeerConnected(this));
     }
 
     public onPeerConnected(peer: MockLiveShare) {
@@ -95,12 +180,24 @@ class MockLiveShare implements vsls.LiveShare, vsls.Session, vsls.Peer {
         return this;
     }
 
-    public start() : Promise<void> {
-        this.changeSessionEmitter.fire({session: this});
+    public async start() : Promise<void> {
+        this._visibleRole = this._role;
+        
+        // Special case, we need to wait for the fire to finish. This means
+        // the real product can have a race condition between starting the session and registering commands? 
+        // Nope, because the guest side can't do anything until the session starts up.
+        await this.changeSessionEmitter.fire({session: this});
+        if (this._role === vsls.Role.Guest) {
+            for (const o of MockLiveShare.others) {
+                if (o._id !== this._id) {
+                    o.onPeerConnected(this);
+                }
+            }
+        }
         return Promise.resolve();
     }
     public get role(): vsls.Role {
-        return this._role;
+        return this._visibleRole;
     }
     public get id(): string {
         return this._id;
@@ -206,6 +303,7 @@ export class MockLiveShareApi implements ILiveShareTestingApi {
 
     private currentRole: vsls.Role = vsls.Role.None;
     private currentApi : MockLiveShare | null = null;
+    private sessionStarted = false;
 
     public getApi(): Promise<vsls.LiveShare | null> {
         return Promise.resolve(this.currentApi);
@@ -219,11 +317,16 @@ export class MockLiveShareApi implements ILiveShareTestingApi {
         }
     }
 
-    public startSession() {
-        if (this.currentRole === vsls.Role.Host && this.currentApi) {
-            this.currentApi.start();
+    public async startSession() : Promise<void> {
+        if (this.currentApi) {
+            await this.currentApi.start();
+            this.sessionStarted = true;
         } else {
-            throw Error('Cannot start session unless host.');
+            throw Error('Cannot start session without a role.');
         }
+    }
+
+    public get isSessionStarted() : boolean {
+        return this.sessionStarted;
     }
 }

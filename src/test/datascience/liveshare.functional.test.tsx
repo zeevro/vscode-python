@@ -198,10 +198,41 @@ suite('LiveShare tests', () => {
         return history;
     }
 
+    function isSessionStarted(role: vsls.Role) : boolean {
+        const container = role === vsls.Role.Host? hostContainer : guestContainer;
+        const api = container.ioc.get<ILiveShareApi>(ILiveShareApi) as ILiveShareTestingApi;
+        return api.isSessionStarted;
+    }
+
     async function addCodeToRole(role: vsls.Role, code: string, expectedRenderCount: number = 5) : Promise<ReactWrapper<any, Readonly<{}>, React.Component>> {
         const container = role === vsls.Role.Host? hostContainer : guestContainer;
-        await addCode(() => getOrCreateHistory(role), container.wrapper, code, expectedRenderCount);
+
+        // If just the host session has started or nobody, just do a normal add code. 
+        const guestStarted = isSessionStarted(vsls.Role.Guest);
+        if (!guestStarted) {
+            await addCode(() => getOrCreateHistory(role), container.wrapper, code, expectedRenderCount);
+        } else {
+            // Otherwise more complicated. We have to wait for renders on both
+
+            // Get a render promise with the expected number of renders for both wrappers
+            const hostRenderPromise = waitForUpdate(hostContainer.wrapper, MainPanel, expectedRenderCount);
+            const guestRenderPromise = waitForUpdate(guestContainer.wrapper, MainPanel, expectedRenderCount);
+
+            // Add code to the apropriate container
+            const host = await getOrCreateHistory(vsls.Role.Host);
+            const guest = await getOrCreateHistory(vsls.Role.Guest);
+            await (role === vsls.Role.Host ? host.addCode(code, 'foo.py', 2) : guest.addCode(code, 'foo.py', 2));
+
+            // Wait for all of the renders to go through
+            await Promise.all([hostRenderPromise, guestRenderPromise]);
+        }
         return container.wrapper;
+    }
+
+    function startSession(role: vsls.Role) : Promise<void> {
+        const container = role === vsls.Role.Host? hostContainer : guestContainer;
+        const api = container.ioc.get<ILiveShareApi>(ILiveShareApi) as ILiveShareTestingApi;
+        return api.startSession();
     }
 
     // Tests to write
@@ -216,6 +247,9 @@ suite('LiveShare tests', () => {
         // Should only need mock data in host
         addMockData(hostContainer.ioc, 'a=1\na', 1);
 
+        // Start the host session first
+        startSession(vsls.Role.Host);
+
         // Just run some code in the host 
         const wrapper = await addCodeToRole(vsls.Role.Host, 'a=1\na');
         verifyHtmlOnCell(wrapper, '<span>1</span>', CellPosition.Last);
@@ -227,7 +261,9 @@ suite('LiveShare tests', () => {
 
         // Create the host history and then the guest history
         const host = await getOrCreateHistory(vsls.Role.Host);
+        await startSession(vsls.Role.Host);
         const guest = await getOrCreateHistory(vsls.Role.Guest);
+        await startSession(vsls.Role.Guest);
 
         // Send code through the host
         const wrapper = await addCodeToRole(vsls.Role.Host, 'a=1\na');
