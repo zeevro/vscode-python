@@ -150,6 +150,7 @@ export function captureTelemetry<P extends IEventNamePropertyMapping, E extends 
                             properties,
                             ex
                         );
+                        throw ex;
                     });
             } else {
                 sendTelemetryEvent(eventName, stopWatch.elapsedTime, properties);
