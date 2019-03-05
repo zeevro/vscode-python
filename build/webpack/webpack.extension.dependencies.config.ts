@@ -7,6 +7,7 @@ import * as path from 'path';
 import * as webpack from 'webpack';
 import { ExtensionRootDir } from '../constants';
 import { getDefaultPlugins, nodeModulesToExternalize } from './common';
+import copyWebpackPlugin = require('copy-webpack-plugin');
 
 const entryItems: Record<string, string> = {};
 nodeModulesToExternalize.forEach(moduleName => {
@@ -31,7 +32,17 @@ const config: webpack.Configuration = {
                         loader: path.join(__dirname, 'loaders', 'fixEvalRequire.js')
                     }
                 ]
-            }
+            },
+            {
+                // vsls live share has expressions in requires. This messes up webpack because it
+                // cannot match them. Not really necessary though. Just replace with a full string.
+                test: /vsls.*js$/,
+                use: [
+                    {
+                        loader: path.join(__dirname, 'loaders', 'fixExprRequire.js')
+                    }
+                ]
+            }            
         ]
     },
     externals: [
@@ -39,7 +50,10 @@ const config: webpack.Configuration = {
         'commonjs'
     ],
     plugins: [
-        ...getDefaultPlugins('dependencies')
+        ...getDefaultPlugins('dependencies'),
+        new copyWebpackPlugin([
+            { from: './node_modules/vsls/*.json', to: '.', context: '.' }
+        ])
     ],
     resolve: {
         extensions: ['.js']

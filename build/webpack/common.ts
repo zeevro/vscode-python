@@ -27,7 +27,8 @@ export const nodeModulesToExternalize = [
     'diff-match-patch',
     'sudo-prompt',
     'node-stream-zip',
-    'xml2js'
+    'xml2js',
+    'vsls/vscode'
 ];
 
 export function getDefaultPlugins(name: 'extension' | 'debugger' | 'dependencies' | 'datascience-ui') {
