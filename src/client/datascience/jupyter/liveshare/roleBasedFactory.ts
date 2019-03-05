@@ -1,8 +1,8 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License.
 'use strict';
-import * as vsls from 'vsls/vscode';
 import * as vscode from 'vscode';
+import * as vsls from 'vsls/vscode';
 
 import { ILiveShareApi } from '../../../common/application/types';
 import { IAsyncDisposable } from '../../../common/types';

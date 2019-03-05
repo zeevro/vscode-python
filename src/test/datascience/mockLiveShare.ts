@@ -2,36 +2,38 @@
 // Licensed under the MIT License.
 'use strict';
 import { injectable } from 'inversify';
-import * as vsls from 'vsls/vscode';
-import * as uuid from 'uuid/v4';
 import * as path from 'path';
-import { Event, Uri, Disposable, TreeDataProvider, EventEmitter, CancellationToken } from 'vscode';
+import * as uuid from 'uuid/v4';
+import { CancellationToken, CancellationTokenSource, Disposable, Event, EventEmitter, TreeDataProvider, Uri } from 'vscode';
+import * as vsls from 'vsls/vscode';
 
 import { ILiveShareTestingApi } from '../../client/common/application/types';
-import { EXTENSION_ROOT_DIR } from '../../client/constants';
-import { noop } from '../../client/common/utils/misc';
 import { IDisposable } from '../../client/common/types';
+import { noop } from '../../client/common/utils/misc';
 
-// tslint:disable:no-any unified-signatures
+// tslint:disable:no-any unified-signatures max-classes-per-file
 
 class MockLiveService implements vsls.SharedService, vsls.SharedServiceProxy {
     public isServiceAvailable: boolean = true;
     private changeIsServiceAvailableEmitter: EventEmitter<boolean> = new EventEmitter<boolean>();
-    private requestHandlers : Map<string, vsls.RequestHandler> = new Map<string, vsls.RequestHandler>();
-    private notifyHandlers : Map<string, vsls.NotifyHandler> = new Map<string, vsls.NotifyHandler>();
+    private requestHandlers: Map<string, vsls.RequestHandler> = new Map<string, vsls.RequestHandler>();
+    private notifyHandlers: Map<string, vsls.NotifyHandler> = new Map<string, vsls.NotifyHandler>();
+    private defaultCancellationSource = new CancellationTokenSource();
 
-    constructor(private name: string) {
+    constructor(name: string) {
+        noop();
     }
 
     public get onDidChangeIsServiceAvailable(): Event<boolean> {
         return this.changeIsServiceAvailableEmitter.event;
     }
     public request(name: string, args: any[], cancellation?: CancellationToken): Promise<any> {
-        // See if any handlers. 
-        const handler = this.requestHandlers.get(name); 
+        // See if any handlers.
+        const handler = this.requestHandlers.get(name);
         if (handler) {
-            return handler(args, cancellation);
+            return handler(args, cancellation ? cancellation : this.defaultCancellationSource.token);
         }
+        return Promise.resolve();
     }
     public onRequest(name: string, handler: vsls.RequestHandler): void {
         this.requestHandlers.set(name, handler);
@@ -40,7 +42,7 @@ class MockLiveService implements vsls.SharedService, vsls.SharedServiceProxy {
         this.notifyHandlers.set(name, handler);
     }
     public notify(name: string, args: object): void {
-        // See if any handlers. 
+        // See if any handlers.
         const handler = this.notifyHandlers.get(name);
         if (handler) {
             handler(args);
@@ -52,20 +54,20 @@ type ArgumentType = 'boolean' | 'number' | 'string' | 'object' | 'function' | 'a
 
 function checkArg(value: any, name: string, type?: ArgumentType) {
     if (!value) {
-        throw new Error('Argument \'' + name + '\' is required.');
+        throw new Error(`Argument \'${name}\' is required.`);
     } else if (type) {
         if (type === 'array') {
             if (!Array.isArray(value)) {
-                throw new Error('Argument \'' + name + '\' must be an array.');
+                throw new Error(`Argument \'${name}\' must be an array.`);
             }
         } else if (type === 'uri') {
             if (!(value instanceof Uri)) {
-                throw new Error('Argument \'' + name + '\' must be a Uri object.');
+                throw new Error(`Argument \'${name}\' must be a Uri object.`);
             }
         } else if (type === 'object' && Array.isArray(value)) {
-            throw new Error('Argument \'' + name + '\' must be a a non-array object.');
+            throw new Error(`Argument \'${name}\' must be a a non-array object.`);
         } else if (typeof value !== type) {
-            throw new Error('Argument \'' + name + '\' must be type \'' + type + '\'.');
+            throw new Error(`Argument \'${name}\' must be type \'' + type + '\'.`);
         }
     }
 }
@@ -74,65 +76,61 @@ type Listener = [Function, any] | Function;
 
 class Emitter<T> {
 
-	private static readonly _noop = function () { };
+    private _event: Event<T> | undefined;
+    private _disposed: boolean = false;
+    private _deliveryQueue: {listener: Listener; event?: T}[] = [];
+    private _listeners: Listener[] = [];
 
-	private _event: Event<T>;
-	private _disposed: boolean;
-	private _deliveryQueue: [Listener, T][];
-	protected _listeners: Listener[] = [];
+    get event(): Event<T> {
+        if (!this._event) {
+            this._event = (listener: (e: T) => any, thisArgs?: any, disposables?: IDisposable[]) => {
+                this._listeners.push(!thisArgs ? listener : [listener, thisArgs]);
+                let result: IDisposable;
+                result = {
+                    dispose: () => {
+                        result.dispose = noop;
+                        if (!this._disposed) {
+                            this._listeners = this._listeners.filter(l => l !== listener);
+                        }
+                    }
+                };
+                if (Array.isArray(disposables)) {
+                    disposables.push(result);
+                }
 
-	get event(): Event<T> {
-		if (!this._event) {
-			this._event = (listener: (e: T) => any, thisArgs?: any, disposables?: IDisposable[]) => {
-				this._listeners.push(!thisArgs ? listener : [listener, thisArgs]);
-				let result: IDisposable;
-				result = {
-					dispose: () => {
-						result.dispose = Emitter._noop;
-						if (!this._disposed) {
-							this._listeners = this._listeners.filter(l => l != listener);
-						}
-					}
-				};
-				if (Array.isArray(disposables)) {
-					disposables.push(result);
-				}
+                return result;
+            };
+        }
+        return this._event;
+    }
 
-				return result;
-			};
-		}
-		return this._event;
-	}
+    public async fire(event?: T): Promise<void> {
+        if (this._listeners) {
+            // put all [listener,event]-pairs into delivery queue
+            // then emit all event. an inner/nested event might be
+            // the driver of this
 
-	/**
-	 * To be kept private to fire an event to
-	 * subscribers
-	 */
-	public async fire(event?: T): Promise<void> {
-		if (this._listeners) {
-			// put all [listener,event]-pairs into delivery queue
-			// then emit all event. an inner/nested event might be
-			// the driver of this
+            if (!this._deliveryQueue) {
+                this._deliveryQueue = [];
+            }
 
-			if (!this._deliveryQueue) {
-				this._deliveryQueue = [];
-			}
+            for (const l of this._listeners) {
+                this._deliveryQueue.push({listener: l, event});
+            }
 
-			for (const l of this._listeners) {
-				this._deliveryQueue.push([l, event]);
-			}
-
-			while (this._deliveryQueue.length > 0) {
-                const [listener, event] = this._deliveryQueue.shift();
-                let result : any;
-				try {
-					if (typeof listener === 'function') {
-						result = listener.call(undefined, event);
-					} else {
-						result = listener[0].call(listener[1], event);
-					}
-				} catch (e) {
-					// Do nothing 
+            while (this._deliveryQueue.length > 0) {
+                const item = this._deliveryQueue.shift();
+                let result: any;
+                try {
+                    if (item && item.listener) {
+                        if (typeof item.listener === 'function') {
+                            result = item.listener.call(undefined, item.event);
+                        } else {
+                            result = item.listener[0].call(item.listener[1], item.event);
+                        }
+                    }
+                } catch (e) {
+                    // Do nothinga
                 }
                 if (result) {
                     const promise = result as Promise<void>;
@@ -140,27 +138,27 @@ class Emitter<T> {
                         await promise;
                     }
                 }
-			}
-		}
+            }
+        }
     }
 
-	public dispose() {
-		if (this._listeners) {
-			this._listeners = undefined;
-		}
-		if (this._deliveryQueue) {
-			this._deliveryQueue.length = 0;
-		}
-		this._disposed = true;
-	}
+    public dispose() {
+        if (this._listeners) {
+            this._listeners = [];
+        }
+        if (this._deliveryQueue) {
+            this._deliveryQueue = [];
+        }
+        this._disposed = true;
+    }
 }
 
 class MockLiveShare implements vsls.LiveShare, vsls.Session, vsls.Peer {
-    private static others : MockLiveShare [] = [];
-    private static services : Map<string, MockLiveService> = new Map<string, MockLiveService>();
+    private static others: MockLiveShare[] = [];
+    private static services: Map<string, MockLiveService> = new Map<string, MockLiveService>();
     private changeSessionEmitter = new Emitter<vsls.SessionChangeEvent>();
     private changePeersEmitter = new EventEmitter<vsls.PeersChangeEvent>();
-    private currentPeers : vsls.Peer[] = [];
+    private currentPeers: vsls.Peer[] = [];
     private _id = uuid();
     private _peerNumber = 0;
     private _visibleRole = vsls.Role.None;
@@ -170,23 +168,23 @@ class MockLiveShare implements vsls.LiveShare, vsls.Session, vsls.Peer {
     }
 
     public onPeerConnected(peer: MockLiveShare) {
-        if (peer.role != this.role) {
+        if (peer.role !== this.role) {
             this.currentPeers.push(peer);
-            this.changePeersEmitter.fire({added: [peer], removed: []});
+            this.changePeersEmitter.fire({ added: [peer], removed: [] });
         }
     }
 
-    public get session() : vsls.Session {
+    public get session(): vsls.Session {
         return this;
     }
 
-    public async start() : Promise<void> {
+    public async start(): Promise<void> {
         this._visibleRole = this._role;
-        
+
         // Special case, we need to wait for the fire to finish. This means
-        // the real product can have a race condition between starting the session and registering commands? 
+        // the real product can have a race condition between starting the session and registering commands?
         // Nope, because the guest side can't do anything until the session starts up.
-        await this.changeSessionEmitter.fire({session: this});
+        await this.changeSessionEmitter.fire({ session: this });
         if (this._role === vsls.Role.Guest) {
             for (const o of MockLiveShare.others) {
                 if (o._id !== this._id) {
@@ -238,14 +236,22 @@ class MockLiveShare implements vsls.LiveShare, vsls.Session, vsls.Peer {
         if (!MockLiveShare.services.has(name)) {
             MockLiveShare.services.set(name, new MockLiveService(name));
         }
-        return Promise.resolve(MockLiveShare.services.get(name));
+        const service = MockLiveShare.services.get(name);
+        if (!service) {
+            throw new Error(`${name} failure to add service to map`);
+        }
+        return Promise.resolve(service);
     }
     public unshareService(name: string): Promise<void> {
         MockLiveShare.services.delete(name);
         return Promise.resolve();
     }
     public getSharedService(name: string): Promise<vsls.SharedServiceProxy> {
-        return Promise.resolve(MockLiveShare.services.get(name));
+        const service = MockLiveShare.services.get(name);
+        if (!service) {
+            throw new Error(`${name} service was not started on the host`);
+        }
+        return Promise.resolve(service);
     }
     public convertLocalUriToShared(localUri: Uri): Uri {
         // Do the same checking that liveshare does
@@ -301,7 +307,7 @@ class MockLiveShare implements vsls.LiveShare, vsls.Session, vsls.Peer {
 export class MockLiveShareApi implements ILiveShareTestingApi {
 
     private currentRole: vsls.Role = vsls.Role.None;
-    private currentApi : MockLiveShare | null = null;
+    private currentApi: MockLiveShare | null = null;
     private sessionStarted = false;
 
     public getApi(): Promise<vsls.LiveShare | null> {
@@ -316,7 +322,7 @@ export class MockLiveShareApi implements ILiveShareTestingApi {
         }
     }
 
-    public async startSession() : Promise<void> {
+    public async startSession(): Promise<void> {
         if (this.currentApi) {
             await this.currentApi.start();
             this.sessionStarted = true;
@@ -325,7 +331,7 @@ export class MockLiveShareApi implements ILiveShareTestingApi {
         }
     }
 
-    public get isSessionStarted() : boolean {
+    public get isSessionStarted(): boolean {
         return this.sessionStarted;
     }
 }

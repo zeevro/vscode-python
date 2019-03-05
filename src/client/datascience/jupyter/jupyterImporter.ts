@@ -5,13 +5,14 @@ import * as fs from 'fs-extra';
 import { inject, injectable } from 'inversify';
 import * as os from 'os';
 import * as path from 'path';
+
 import { IWorkspaceService } from '../../common/application/types';
 import { IFileSystem } from '../../common/platform/types';
 import { IConfigurationService, IDisposableRegistry } from '../../common/types';
 import * as localize from '../../common/utils/localize';
+import { noop } from '../../common/utils/misc';
 import { CodeSnippits } from '../constants';
 import { IJupyterExecution, INotebookImporter } from '../types';
-import { noop } from '../../common/utils/misc';
 
 @injectable()
 export class JupyterImporter implements INotebookImporter {
@@ -106,7 +107,7 @@ export class JupyterImporter implements INotebookImporter {
                 // Save this file into our disposables so the temp file goes away
                 this.disposableRegistry.push(file);
                 await fs.appendFile(file.filePath, this.nbconvertTemplate);
-    
+
                 // Now we should have a template that will convert
                 return file.filePath;
             } catch {

@@ -44,18 +44,6 @@ export class PostOffice extends React.Component<IPostOfficeProps> {
         }
     }
 
-    private acquireApi() : IVsCodeApi | undefined {
-
-        // Only do this once as it crashes if we ask more than once
-        if (!this.vscodeApi &&
-            // tslint:disable-next-line:no-typeof-undefined
-            typeof acquireVsCodeApi !== 'undefined') {
-            this.vscodeApi = acquireVsCodeApi();
-        }
-
-        return this.vscodeApi;
-    }
-
     public componentDidMount() {
         if (!this.registered) {
             this.registered = true;
@@ -72,6 +60,18 @@ export class PostOffice extends React.Component<IPostOfficeProps> {
 
     public render() {
         return null;
+    }
+
+    private acquireApi() : IVsCodeApi | undefined {
+
+        // Only do this once as it crashes if we ask more than once
+        if (!this.vscodeApi &&
+            // tslint:disable-next-line:no-typeof-undefined
+            typeof acquireVsCodeApi !== 'undefined') {
+            this.vscodeApi = acquireVsCodeApi();
+        }
+
+        return this.vscodeApi;
     }
 
     private handleMessages = async (ev: MessageEvent) => {

@@ -3,6 +3,7 @@
 'use strict';
 //tslint:disable:trailing-comma
 import * as child_process from 'child_process';
+import { interfaces } from 'inversify';
 import * as path from 'path';
 import * as TypeMoq from 'typemoq';
 import {
@@ -70,7 +71,9 @@ import { EnvironmentVariablesService } from '../../client/common/variables/envir
 import { SystemVariables } from '../../client/common/variables/systemVariables';
 import { IEnvironmentVariablesProvider, IEnvironmentVariablesService } from '../../client/common/variables/types';
 import { CodeCssGenerator } from '../../client/datascience/codeCssGenerator';
+import { CodeWatcher } from '../../client/datascience/editor-integration/codewatcher';
 import { History } from '../../client/datascience/history';
+import { HistoryCommandListener } from '../../client/datascience/historycommandlistener';
 import { HistoryProvider } from '../../client/datascience/historyProvider';
 import { JupyterCommandFactory } from '../../client/datascience/jupyter/jupyterCommand';
 import { JupyterExecutionFactory } from '../../client/datascience/jupyter/jupyterExecutionFactory';
@@ -82,7 +85,9 @@ import { StatusProvider } from '../../client/datascience/statusProvider';
 import { ThemeFinder } from '../../client/datascience/themeFinder';
 import {
     ICodeCssGenerator,
+    ICodeWatcher,
     IDataScience,
+    IDataScienceCommandListener,
     IHistory,
     IHistoryProvider,
     IJupyterCommandFactory,
@@ -92,9 +97,7 @@ import {
     INotebookImporter,
     INotebookServer,
     IStatusProvider,
-    IThemeFinder,
-    ICodeWatcher,
-    IDataScienceCommandListener
+    IThemeFinder
 } from '../../client/datascience/types';
 import { EnvironmentActivationService } from '../../client/interpreter/activation/service';
 import { IEnvironmentActivationService } from '../../client/interpreter/activation/types';
@@ -165,13 +168,10 @@ import { IVirtualEnvironmentManager } from '../../client/interpreter/virtualEnvs
 import { MockAutoSelectionService } from '../mocks/autoSelector';
 import { UnitTestIocContainer } from '../unittests/serviceRegistry';
 import { MockCommandManager } from './mockCommandManager';
+import { MockDocumentManager } from './mockDocumentManager';
 import { MockExtensions } from './mockExtensions';
 import { MockJupyterManager } from './mockJupyterManager';
 import { MockLiveShareApi } from './mockLiveShare';
-import { interfaces } from 'inversify';
-import { CodeWatcher } from '../../client/datascience/editor-integration/codewatcher';
-import { HistoryCommandListener } from '../../client/datascience/historycommandlistener';
-import { MockDocumentManager } from './mockDocumentManager';
 
 export class DataScienceIocContainer extends UnitTestIocContainer {
 

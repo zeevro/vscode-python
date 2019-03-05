@@ -3,7 +3,7 @@
 'use strict';
 import '../../../common/extensions';
 
-import { CancellationToken, Event, EventEmitter } from 'vscode';
+import { CancellationToken } from 'vscode';
 import * as vsls from 'vsls/vscode';
 
 import { ILiveShareApi, IWorkspaceService } from '../../../common/application/types';

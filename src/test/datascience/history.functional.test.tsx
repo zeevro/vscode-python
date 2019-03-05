@@ -4,12 +4,11 @@
 import * as assert from 'assert';
 import { mount, ReactWrapper } from 'enzyme';
 import * as fs from 'fs-extra';
-import { min } from 'lodash';
 import * as path from 'path';
 import * as React from 'react';
 import { SemVer } from 'semver';
 import * as TypeMoq from 'typemoq';
-import { CancellationToken, Disposable, TextDocument, TextEditor } from 'vscode';
+import { Disposable, TextDocument, TextEditor } from 'vscode';
 
 import {
     IApplicationShell,
@@ -19,8 +18,6 @@ import {
     IWebPanelProvider,
     WebPanelMessage
 } from '../../client/common/application/types';
-import { EXTENSION_ROOT_DIR } from '../../client/common/constants';
-import { IDataScienceSettings } from '../../client/common/types';
 import { createDeferred, Deferred } from '../../client/common/utils/async';
 import { noop } from '../../client/common/utils/misc';
 import { Architecture } from '../../client/common/utils/platform';
@@ -32,14 +29,32 @@ import { InterpreterType, PythonInterpreter } from '../../client/interpreter/con
 import { CellButton } from '../../datascience-ui/history-react/cellButton';
 import { MainPanel } from '../../datascience-ui/history-react/MainPanel';
 import { IVsCodeApi } from '../../datascience-ui/react-common/postOffice';
-import { updateSettings } from '../../datascience-ui/react-common/settingsReactSide';
 import { sleep } from '../core';
 import { DataScienceIocContainer } from './dataScienceIocContainer';
+import {
+    addCode,
+    addContinuousMockData,
+    addMockData,
+    CellInputState,
+    CellPosition,
+    defaultDataScienceSettings,
+    enterInput,
+    escapePath,
+    findButton,
+    getCellResults,
+    getLastOutputCell,
+    getMainPanel,
+    initialDataScienceSettings,
+    srcDirectory,
+    toggleCellExpansion,
+    updateDataScienceSettings,
+    verifyHtmlOnCell,
+    verifyLastCellInputState
+} from './historyTestHelpers';
 import { SupportedCommands } from './mockJupyterManager';
-import { blurWindow, createInputEvent, createKeyboardEvent, waitForUpdate } from './reactHelpers';
-import { addMockData, addCode, verifyHtmlOnCell, CellPosition, verifyLastCellInputState, CellInputState, addContinuousMockData, findButton, enterInput, getLastOutputCell, getCellResults, initialDataScienceSettings, defaultDataScienceSettings, toggleCellExpansion, updateDataScienceSettings, escapePath, srcDirectory, getMainPanel } from './historyTestHelpers';
+import { blurWindow, waitForUpdate } from './reactHelpers';
 
-// tslint:disable-next-line:max-func-body-length trailing-comma no-any no-multiline-string
+// tslint:disable:max-func-body-length trailing-comma no-any no-multiline-string
 suite('History output tests', () => {
     const disposables: Disposable[] = [];
     let jupyterExecution: IJupyterExecution;
@@ -164,8 +179,6 @@ suite('History output tests', () => {
             }
         });
     }
-
-
 
     async function waitForMessageResponse(action: () => void): Promise<void> {
         webPanelMessagePromise = createDeferred();

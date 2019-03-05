@@ -71,6 +71,8 @@ export class HistoryCommandListener implements IDataScienceCommandListener {
                         return this.exportFile(activeEditor.document.fileName);
                     }
                 }
+
+                return Promise.resolve();
             });
         });
         this.disposableRegistry.push(disposable);
@@ -84,6 +86,7 @@ export class HistoryCommandListener implements IDataScienceCommandListener {
                         return this.exportFileAndOutput(activeEditor.document.fileName);
                     }
                 }
+                return Promise.resolve();
             });
         });
         this.disposableRegistry.push(disposable);
@@ -97,10 +100,10 @@ export class HistoryCommandListener implements IDataScienceCommandListener {
         this.disposableRegistry.push(commandManager.registerCommand(Commands.ExportOutputAsNotebook, () => this.exportCells()));
     }
 
-    private async listenForErrors(promise: () => Promise<any>) : Promise<any> {
+    // tslint:disable:no-any
+    private listenForErrors(promise: () => Promise<any>) : Promise<any> {
         try {
-            const result = await promise();
-            return result;
+            return promise();
         } catch (err) {
             if (!(err instanceof CancellationError)) {
                 if (err.message) {
@@ -114,6 +117,7 @@ export class HistoryCommandListener implements IDataScienceCommandListener {
                 this.logger.logInformation('Canceled');
             }
         }
+        return Promise.resolve();
     }
 
     private showInformationMessage(message: string, question?: string) : Thenable<string | undefined> {
@@ -209,9 +213,9 @@ export class HistoryCommandListener implements IDataScienceCommandListener {
                                 this.jupyterExecution.spawnNotebook(output).ignoreErrors();
                             }
                         });
-                    }
 
-                    return Uri.file(output);
+                        return Uri.file(output);
+                    }
                 }
             }
         } else {

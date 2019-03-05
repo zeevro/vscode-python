@@ -16,7 +16,7 @@ import { CellButton } from '../../datascience-ui/history-react/cellButton';
 import { MainPanel } from '../../datascience-ui/history-react/MainPanel';
 import { updateSettings } from '../../datascience-ui/react-common/settingsReactSide';
 import { DataScienceIocContainer } from './dataScienceIocContainer';
-import { createInputEvent, createKeyboardEvent, waitForRender, waitForUpdate } from './reactHelpers';
+import { createInputEvent, createKeyboardEvent, waitForUpdate } from './reactHelpers';
 
 //tslint:disable:trailing-comma no-any no-multiline-string
 export enum CellInputState {

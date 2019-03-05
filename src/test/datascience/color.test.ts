@@ -2,15 +2,15 @@
 // Licensed under the MIT License.
 'use strict';
 import { assert } from 'chai';
+import * as TypeMoq from 'typemoq';
+import { WorkspaceConfiguration } from 'vscode';
 
 import { Extensions } from '../../client/common/application/extensions';
+import { IWorkspaceService } from '../../client/common/application/types';
 import { Logger } from '../../client/common/logger';
 import { CurrentProcess } from '../../client/common/process/currentProcess';
-import { ThemeFinder } from '../../client/datascience/themeFinder';
 import { CodeCssGenerator } from '../../client/datascience/codeCssGenerator';
-import * as TypeMoq from 'typemoq';
-import { IWorkspaceService } from '../../client/common/application/types';
-import { workspace, WorkspaceConfiguration } from 'vscode';
+import { ThemeFinder } from '../../client/datascience/themeFinder';
 
 suite('Theme colors', () => {
     let themeFinder: ThemeFinder;
@@ -50,7 +50,7 @@ suite('Theme colors', () => {
 
     function runTest(themeName: string, isDark: boolean, shouldExist: boolean) {
         test(themeName, async () => {
-            const json = await themeFinder.findThemeRootJson(themeName)
+            const json = await themeFinder.findThemeRootJson(themeName);
             if (shouldExist) {
                 assert.ok(json, `Cannot find theme ${themeName}`);
                 const actuallyDark = await themeFinder.isThemeDark(themeName);
@@ -72,12 +72,12 @@ suite('Theme colors', () => {
                 const colors = await cssGenerator.generateThemeCss();
                 assert.ok(colors, `Cannot find theme colors for ${themeName}`);
 
-                // Make sure we have a string value that is not set to a variable 
+                // Make sure we have a string value that is not set to a variable
                 // (that would be the default and all themes have a string color)
                 const matches = /span\.cm-string\s\{color\:\s(.*?);/gm.exec(colors);
                 assert.ok(matches, 'No matches found for string color');
-                assert.equal(matches.length, 2, 'Wrong number of matches for for string color');
-                assert.ok(matches[1].includes('#'), 'String color not found');
+                assert.equal(matches!.length, 2, 'Wrong number of matches for for string color');
+                assert.ok(matches![1].includes('#'), 'String color not found');
             } else {
                 assert.notOk(json, `Found ${themeName} when not expected`);
             }

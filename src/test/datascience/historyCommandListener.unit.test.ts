@@ -7,23 +7,9 @@ import { anything, instance, mock, when } from 'ts-mockito';
 import { Matcher } from 'ts-mockito/lib/matcher/type/Matcher';
 import * as TypeMoq from 'typemoq';
 import * as uuid from 'uuid/v4';
-import {
-    Disposable,
-    Event,
-    EventEmitter,
-    TextDocument,
-    TextDocumentShowOptions,
-    TextEditor,
-    TextEditorOptionsChangeEvent,
-    TextEditorSelectionChangeEvent,
-    TextEditorViewColumnChangeEvent,
-    Uri,
-    ViewColumn,
-    WorkspaceEdit
-} from 'vscode';
+import { Disposable, EventEmitter, Uri } from 'vscode';
 
 import { ApplicationShell } from '../../client/common/application/applicationShell';
-import { IDocumentManager } from '../../client/common/application/types';
 import { PythonSettings } from '../../client/common/configSettings';
 import { ConfigurationService } from '../../client/common/configuration/service';
 import { Logger } from '../../client/common/logger';
@@ -44,7 +30,6 @@ import { ServiceContainer } from '../../client/ioc/container';
 import { noop } from '../core';
 import { MockAutoSelectionService } from '../mocks/autoSelector';
 import * as vscodeMocks from '../vscode-mock';
-import { createDocument } from './editor-integration/helpers';
 import { MockCommandManager } from './mockCommandManager';
 import { MockDocumentManager } from './mockDocumentManager';
 

@@ -24,7 +24,7 @@ export class HistoryProvider implements IHistoryProvider, IAsyncDisposable {
     private activeHistory : IHistory | undefined;
     private postOffice : PostOffice;
     private id: string;
-    private pendingSyncs : Map<string, ISyncData> = new Map<string, ISyncData>(); 
+    private pendingSyncs : Map<string, ISyncData> = new Map<string, ISyncData>();
     constructor(
         @inject(ILiveShareApi) liveShare: ILiveShareApi,
         @inject(IServiceContainer) private serviceContainer: IServiceContainer,
