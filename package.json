@@ -1315,8 +1315,8 @@
                 },
                 "python.dataScience.allowLiveShare": {
                     "type": "boolean",
-                    "default": false,
-                    "description": "Allow the Python Interactive window to be shared during a Live Share session (experimental)",
+                    "default": true,
+                    "description": "Allow the Python Interactive window to be shared during a Live Share session",
                     "scope": "resource"
                 },
                 "python.disableInstallationCheck": {
