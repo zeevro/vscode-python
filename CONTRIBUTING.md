@@ -45,12 +45,10 @@ You may see warnings that ```The engine "vscode" appears to be invalid.```, you 
 
 Run the `Compile` and `Hygiene` build Tasks from the [Command Palette](https://code.visualstudio.com/docs/editor/tasks) (short cut `CTRL+SHIFT+B` or `⇧⌘B`)
 
-You can also compile from the command-line:
-
+You can also compile from the command-line. For a full compile you can use `npx gulp prePublishNonBundle`. For incremental builds you can use the following commands depending on your needs:
 ```shell
-npx gulp prePublishNonBundle  # full compile
-npm run compile  # incremental
-npm run compile-webviews-watch # incremental for data science (React Code)
+npm run compile
+npm run compile-webviews-watch # For data science (React Code)
 ```
 
 Sometimes you will need to run `npm run clean` and even `rm -r out`.
@@ -220,10 +218,6 @@ It is also very important to make the title accurate. People often write very br
 Once an issue has been appropriately classified, there are two keys ways to help out. One is to go through open issues that [`needs verification`](https://github.com/Microsoft/vscode-python/labels/needs%20verification). Issues with this label have not been verified to be an actual problem (e.g. making sure the reported issue is not caused by the user's configuration or machine).
 
 The other way to help is to go through issues that are labeled as [`validate fix`](https://github.com/Microsoft/vscode-python/labels/validate%20fix). These issues are believed to be fixed, but having an independent validation is always appreciated.
-
-#### Closed issues
-
-If a closed issue is labeled with ["volunteer"](https://github.com/Microsoft/vscode-python/issues?q=label%3Avolunteer+is%3Aclosed) that means the development team has no plans to implement the work for the issue, but that we would accept a pull request if provided. We close these types of issues to help us stay focused on the issues we do plan/hope to get to (which we will also accept pull requests for, just please discuss design considerations with us first to help make sure your pull request will be accepted).
 
 ### Pull requests
 
