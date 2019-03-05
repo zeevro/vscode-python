@@ -32,16 +32,6 @@ const config: webpack.Configuration = {
                         loader: path.join(__dirname, 'loaders', 'fixEvalRequire.js')
                     }
                 ]
-            },
-            {
-                // vsls live share has expressions in requires. This messes up webpack because it
-                // cannot match them. Not really necessary though. Just replace with a full string.
-                test: /vsls.*js$/,
-                use: [
-                    {
-                        loader: path.join(__dirname, 'loaders', 'fixExprRequire.js')
-                    }
-                ]
             }            
         ]
     },
@@ -51,8 +41,10 @@ const config: webpack.Configuration = {
     ],
     plugins: [
         ...getDefaultPlugins('dependencies'),
+        // vsls requires our package.json to be next to node_modules. It's how they
+        // 'find' the calling extension.
         new copyWebpackPlugin([
-            { from: './node_modules/vsls/*.json', to: '.', context: '.' }
+            { from: './package.json', to: '.' }
         ])
     ],
     resolve: {

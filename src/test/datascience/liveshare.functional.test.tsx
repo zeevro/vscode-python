@@ -194,7 +194,7 @@ suite('LiveShare tests', () => {
         container.wrapper = mounted;
 
         // We can remove the global api and event listener now.
-        delete (global as any)['ascquireVsCodeApi'];
+        delete (global as any)['acquireVsCodeApi'];
         window.addEventListener = oldListener;
     }
 
@@ -339,6 +339,8 @@ suite('LiveShare tests', () => {
             await codeWatcher.runAllCells();
         });
         verifyHtmlOnCell(wrapper, '<span>1</span>', CellPosition.Last);
+        assert.ok(hostContainer.wrapper, 'Host wrapper not created for some reason');
+        verifyHtmlOnCell(hostContainer.wrapper!, '<span>1</span>', CellPosition.Last);
     });
 
     test('Export from guest', async () => {

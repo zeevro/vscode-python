@@ -86,7 +86,9 @@ export class RoleBasedFactory<T extends IRoleBasedObject, CtorType extends Class
                 }
 
                 // Fire our event indicating old data is no longer valid.
-                this.sessionChangedEmitter.fire();
+                if (newRole !== role) {
+                    this.sessionChangedEmitter.fire();
+                }
             });
             api.onDidChangePeers((e) => {
                 if (!objDisposed) {

@@ -194,6 +194,11 @@ class MockLiveShare implements vsls.LiveShare, vsls.Session, vsls.Peer {
         }
         return Promise.resolve();
     }
+
+    public getContacts(emails: string[]): Promise<vsls.ContactsCollection> {
+        throw new Error('Method not implemented.');
+    }
+
     public get role(): vsls.Role {
         return this._visibleRole;
     }
@@ -207,7 +212,8 @@ class MockLiveShare implements vsls.LiveShare, vsls.Session, vsls.Peer {
         return {
             displayName: 'Test',
             emailAddress: 'Test@Microsoft.Com',
-            userName: 'Test'
+            userName: 'Test',
+            id: '0'
         };
     }
     public get access(): vsls.Access {

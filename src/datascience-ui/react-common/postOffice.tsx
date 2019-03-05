@@ -65,9 +65,8 @@ export class PostOffice extends React.Component<IPostOfficeProps> {
     private acquireApi() : IVsCodeApi | undefined {
 
         // Only do this once as it crashes if we ask more than once
-        if (!this.vscodeApi &&
-            // tslint:disable-next-line:no-typeof-undefined
-            typeof acquireVsCodeApi !== 'undefined') {
+        // tslint:disable-next-line:no-typeof-undefined
+        if (!this.vscodeApi && typeof acquireVsCodeApi !== 'undefined') {
             this.vscodeApi = acquireVsCodeApi();
         }
 
