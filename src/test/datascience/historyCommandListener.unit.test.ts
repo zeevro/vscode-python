@@ -191,6 +191,9 @@ suite('History command listener', async () => {
 
         documentManager.addDocument('#%%\r\nprint("code")', 'bar.ipynb');
 
+        when(applicationShell.showInformationMessage(anything(), anything())).thenReturn(Promise.resolve('moo'));
+        when(applicationShell.showInformationMessage(anything())).thenReturn(Promise.resolve('moo'));
+
         const result = new HistoryCommandListener(
             disposableRegistry,
             instance(historyProvider),
