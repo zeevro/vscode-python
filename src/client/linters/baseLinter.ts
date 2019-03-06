@@ -15,6 +15,7 @@ import {
     ILinter, ILinterInfo, ILinterManager, ILintMessage,
     LinterId, LintMessageSeverity
 } from './types';
+import { IInterpreterService, InterpreterType } from '../interpreter/contracts';
 
 // tslint:disable-next-line:no-require-imports no-var-requires no-any
 const namedRegexp = require('named-js-regexp');
@@ -72,6 +73,7 @@ export abstract class BaseLinter implements ILinter {
     private _pythonSettings!: IPythonSettings;
     private _info: ILinterInfo;
     private workspace: IWorkspaceService;
+    private interpreterService: IInterpreterService;
 
     protected get pythonSettings(): IPythonSettings {
         return this._pythonSettings;
@@ -85,6 +87,7 @@ export abstract class BaseLinter implements ILinter {
         this.errorHandler = new ErrorHandler(this.info.product, outputChannel, serviceContainer);
         this.configService = serviceContainer.get<IConfigurationService>(IConfigurationService);
         this.workspace = serviceContainer.get<IWorkspaceService>(IWorkspaceService);
+        this.interpreterService = serviceContainer.get<IInterpreterService>(IInterpreterService);
     }
 
     public get info(): ILinterInfo {
@@ -138,7 +141,12 @@ export abstract class BaseLinter implements ILinter {
         const cwd = this.getWorkspaceRootPath(document);
         const pythonToolsExecutionService = this.serviceContainer.get<IPythonToolExecutionService>(IPythonToolExecutionService);
         try {
-            const result = await pythonToolsExecutionService.exec(executionInfo, { cwd, token: cancellation, mergeStdOutErr: false }, document.uri);
+            let myEnv = {};
+            const activeInterpreter = await this.interpreterService.getActiveInterpreter(document.uri);
+            if (activeInterpreter.type !== InterpreterType.Unknown) {
+                myEnv = { VIRTUAL_ENV: activeInterpreter.sysPrefix };  // For some reason activeInterpreter.envPath doesn't work
+            }
+            const result = await pythonToolsExecutionService.exec(executionInfo, { cwd, token: cancellation, mergeStdOutErr: false, env: myEnv }, document.uri);
             this.displayLinterResultHeader(result.stdout);
             return await this.parseMessages(result.stdout, document, cancellation, regEx);
         } catch (error) {

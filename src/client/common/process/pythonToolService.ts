@@ -12,7 +12,7 @@ export class PythonToolExecutionService implements IPythonToolExecutionService {
     constructor(@inject(IServiceContainer) private serviceContainer: IServiceContainer) { }
     public async execObservable(executionInfo: ExecutionInfo, options: SpawnOptions, resource: Uri): Promise<ObservableExecutionResult<string>> {
         if (options.env) {
-            throw new Error('Environment variables are not supported');
+            Object.assign(env, process.env);
         }
         if (executionInfo.moduleName && executionInfo.moduleName.length > 0) {
             const pythonExecutionService = await this.serviceContainer.get<IPythonExecutionFactory>(IPythonExecutionFactory).create({ resource });
@@ -24,7 +24,7 @@ export class PythonToolExecutionService implements IPythonToolExecutionService {
     }
     public async exec(executionInfo: ExecutionInfo, options: SpawnOptions, resource: Uri): Promise<ExecutionResult<string>> {
         if (options.env) {
-            throw new Error('Environment variables are not supported');
+            Object.assign(env, process.env);
         }
         if (executionInfo.moduleName && executionInfo.moduleName.length > 0) {
             const pythonExecutionService = await this.serviceContainer.get<IPythonExecutionFactory>(IPythonExecutionFactory).create({ resource });
